@@ -1,0 +1,253 @@
+@model WebApplicationFrontend.Services.WebUserLoginResponse
+@{
+    ViewData["Title"] = "Station Operator Dashboard";
+}
+
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-charging-station text-success me-2"></i>
+                        Station Operator Dashboard
+                    </h1>
+                    <p class="text-muted mb-0">Welcome back, @Model.FullName</p>
+                </div>
+                <div class="d-flex align-items-center">
+                    <span class="badge bg-success me-3">
+                        <i class="fas fa-user-cog me-1"></i>
+                        @Model.Role
+                    </span>
+                    <div class="dropdown">
+                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user-circle me-1"></i>
+                            @Model.FullName
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-user me-2"></i>Profile</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-cog me-2"></i>Settings</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="@Url.Action("Logout", "Account")">
+                                <i class="fas fa-sign-out-alt me-2"></i>Logout
+                            </a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title opacity-75">Stations Managed</h6>
+                            <h2 class="mb-0">@ViewBag.StationsManaged</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-charging-station fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title opacity-75">Active Bookings</h6>
+                            <h2 class="mb-0">@ViewBag.ActiveBookings</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-calendar-check fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title opacity-75">Today's Bookings</h6>
+                            <h2 class="mb-0">@ViewBag.TodaysBookings</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-clock fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title opacity-75">Revenue Today</h6>
+                            <h2 class="mb-0">$245</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-dollar-sign fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="row">
+        <!-- Station Operations -->
+        <div class="col-lg-6 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-transparent border-bottom-0">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-tools text-primary me-2"></i>
+                        Station Operations
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-3">
+                        <a href="#" class="btn btn-outline-success d-flex align-items-center">
+                            <i class="fas fa-qrcode me-3"></i>
+                            <div class="text-start">
+                                <div class="fw-semibold">QR Code Scanner</div>
+                                <small class="text-muted">Scan customer QR codes</small>
+                            </div>
+                        </a>
+                        <a href="#" class="btn btn-outline-warning d-flex align-items-center">
+                            <i class="fas fa-cog me-3"></i>
+                            <div class="text-start">
+                                <div class="fw-semibold">Station Settings</div>
+                                <small class="text-muted">Configure station parameters</small>
+                            </div>
+                        </a>
+                        <a href="#" class="btn btn-outline-info d-flex align-items-center">
+                            <i class="fas fa-calendar-alt me-3"></i>
+                            <div class="text-start">
+                                <div class="fw-semibold">Schedule Management</div>
+                                <small class="text-muted">Update availability slots</small>
+                            </div>
+                        </a>
+                        <a href="#" class="btn btn-outline-primary d-flex align-items-center">
+                            <i class="fas fa-users me-3"></i>
+                            <div class="text-start">
+                                <div class="fw-semibold">Customer Support</div>
+                                <small class="text-muted">Assist EV owners</small>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Today's Schedule -->
+        <div class="col-lg-6 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-transparent border-bottom-0 d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-calendar text-success me-2"></i>
+                        Today's Schedule
+                    </h5>
+                    <span class="badge bg-light text-dark">@DateTime.Now.ToString("MMM dd, yyyy")</span>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">08:00 - 09:00</h6>
+                                <p class="mb-1 text-muted">Station A - Slot 1</p>
+                                <small class="text-success">EV001234 - Active</small>
+                            </div>
+                            <span class="badge bg-success rounded-pill">Active</span>
+                        </div>
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">10:30 - 11:30</h6>
+                                <p class="mb-1 text-muted">Station B - Slot 2</p>
+                                <small class="text-warning">EV005678 - Pending</small>
+                            </div>
+                            <span class="badge bg-warning rounded-pill">Pending</span>
+                        </div>
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">14:00 - 15:00</h6>
+                                <p class="mb-1 text-muted">Station A - Slot 3</p>
+                                <small class="text-info">EV009012 - Scheduled</small>
+                            </div>
+                            <span class="badge bg-info rounded-pill">Scheduled</span>
+                        </div>
+                        <div class="list-group-item text-center">
+                            <a href="#" class="btn btn-sm btn-outline-primary">View Full Schedule</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Station Status -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent border-bottom-0">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-broadcast-tower text-info me-2"></i>
+                        Station Status Overview
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-lg-4 mb-3">
+                            <div class="p-3 border rounded">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="mb-0">Station A</h6>
+                                    <span class="badge bg-success">Online</span>
+                                </div>
+                                <p class="text-muted mb-2">AC Charging • 3 Slots</p>
+                                <div class="progress mb-2" style="height: 8px;">
+                                    <div class="progress-bar bg-success" style="width: 67%"></div>
+                                </div>
+                                <small class="text-muted">2/3 slots occupied</small>
+                            </div>
+                        </div>
+                        <div class="col-lg-4 mb-3">
+                            <div class="p-3 border rounded">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="mb-0">Station B</h6>
+                                    <span class="badge bg-warning">Maintenance</span>
+                                </div>
+                                <p class="text-muted mb-2">DC Fast Charging • 2 Slots</p>
+                                <div class="progress mb-2" style="height: 8px;">
+                                    <div class="progress-bar bg-warning" style="width: 50%"></div>
+                                </div>
+                                <small class="text-muted">1/2 slots available</small>
+                            </div>
+                        </div>
+                        <div class="col-lg-4 mb-3">
+                            <div class="p-3 border rounded">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="mb-0">Station C</h6>
+                                    <span class="badge bg-success">Online</span>
+                                </div>
+                                <p class="text-muted mb-2">AC Charging • 4 Slots</p>
+                                <div class="progress mb-2" style="height: 8px;">
+                                    <div class="progress-bar bg-success" style="width: 25%"></div>
+                                </div>
+                                <small class="text-muted">1/4 slots occupied</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
