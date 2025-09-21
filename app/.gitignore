@@ -1,1 +1,10 @@
 /build
+local.properties
+gradlew
+gradlew.bat
+gradle/wrapper/gradle-wrapper.jar
+
+.idea/
+*.iml
+*.iws
+*.ipr

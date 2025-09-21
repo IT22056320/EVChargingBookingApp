@@ -224,6 +224,72 @@ namespace WebApplication1.Controllers
         }
 
         /// <summary>
+        /// Login EV owner (for mobile app) - Updated to use email for authentication
+        /// </summary>
+        [HttpPost("login")]
+        public async Task<ActionResult> LoginEVOwner([FromBody] LoginEVOwnerRequest request)
+        {
+            try
+            {
+                // Validate required fields
+                if (string.IsNullOrWhiteSpace(request.Email))
+                    return BadRequest("Email is required");
+
+                if (string.IsNullOrWhiteSpace(request.Password))
+                    return BadRequest("Password is required");
+
+                // Find EV owner by Email instead of NIC
+                var evOwner = await _mongoDBService.EVOwners
+                    .Find(u => u.Email == request.Email)
+                    .FirstOrDefaultAsync();
+
+                if (evOwner == null)
+                    return BadRequest("Invalid email or password");
+
+                // Check if account is approved
+                if (!evOwner.IsApproved)
+                    return BadRequest("Account is pending approval by backoffice staff");
+
+                // Check if account is active
+                if (!evOwner.IsActive)
+                    return BadRequest("Account has been deactivated. Please contact support.");
+
+                // Verify password
+                if (!BCrypt.Net.BCrypt.Verify(request.Password, evOwner.Password))
+                    return BadRequest("Invalid email or password");
+
+                // Update last login time using NIC as primary key
+                var filter = Builders<User>.Filter.Eq(u => u.NIC, evOwner.NIC);
+                var update = Builders<User>.Update.Set(u => u.LastLoginAt, DateTime.UtcNow);
+                await _mongoDBService.EVOwners.UpdateOneAsync(filter, update);
+
+                // Return user info (without password)
+                var response = new
+                {
+                    evOwner.Id,
+                    evOwner.NIC,
+                    evOwner.FullName,
+                    evOwner.Email,
+                    evOwner.PhoneNumber,
+                    evOwner.Address,
+                    evOwner.IsActive,
+                    evOwner.IsApproved,
+                    evOwner.RegisteredAt,
+                    evOwner.LastLoginAt
+                };
+
+                return Ok(new { 
+                    message = "Login successful",
+                    user = response
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Login failed", error = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// Get pending approvals (Backoffice dashboard)
         /// </summary>
         [HttpGet("pending-approvals")]
@@ -282,5 +348,14 @@ namespace WebApplication1.Controllers
     public class StatusUpdateRequest
     {
         public bool IsActive { get; set; }
+    }
+
+    /// <summary>
+    /// EV Owner login request model - Updated to use email for authentication
+    /// </summary>
+    public class LoginEVOwnerRequest
+    {
+        public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
     }
 }
