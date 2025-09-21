@@ -243,5 +243,49 @@ namespace WebApplication1.Controllers
                 });
             }
         }
+
+        /// <summary>
+        /// Test station operator login for mobile app
+        /// </summary>
+        [HttpPost("test-station-operator-login")]
+        public async Task<ActionResult> TestStationOperatorLogin([FromQuery] string email = "operator@evcharging.com", [FromQuery] string password = "operator123")
+        {
+            var webUsersController = new WebUsersController(_mongoDBService);
+
+            var loginRequest = new WebUserLoginRequest
+            {
+                Email = email,
+                Password = password
+            };
+
+            return await webUsersController.Login(loginRequest);
+        }
+
+        /// <summary>
+        /// Get station operator test credentials
+        /// </summary>
+        [HttpGet("station-operator-credentials")]
+        public ActionResult GetStationOperatorCredentials()
+        {
+            return Ok(new
+            {
+                Title = "Station Operator Test Credentials",
+                Description = "Use these credentials to test station operator login in the mobile app",
+                Credentials = new[]
+                {
+                    new { Email = "operator@evcharging.com", Password = "operator123", Name = "Station Operator" },
+                    new { Email = "operator2@evcharging.com", Password = "operator123", Name = "Station Operator 2" },
+                    new { Email = "admin@evcharging.com", Password = "admin123", Name = "System Administrator" }
+                },
+                Instructions = new[]
+                {
+                    "1. Run POST /api/SeedData/create-web-users to create test station operators",
+                    "2. Use the mobile app to login with any of the above credentials",
+                    "3. The app will automatically detect if you're an EV owner or station operator",
+                    "4. Station operators can access both web app and mobile app"
+                },
+                Note = "Station operators authenticate via /api/WebUsers/login endpoint"
+            });
+        }
     }
 }
