@@ -172,6 +172,31 @@ namespace WebApplicationFrontend.Services
         }
 
         /// <summary>
+        /// Get EV owner by NIC
+        /// </summary>
+        public async Task<EVOwnerDto?> GetEVOwnerByNICAsync(string nic)
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync($"{_baseUrl}/EVOwners/{nic}");
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    var owner = JsonSerializer.Deserialize<EVOwnerDto>(content, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                    return owner;
+                }
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
         /// Update EV owner account status
         /// </summary>
         public async Task<bool> UpdateEVOwnerStatusAsync(string nic, bool isActive)
