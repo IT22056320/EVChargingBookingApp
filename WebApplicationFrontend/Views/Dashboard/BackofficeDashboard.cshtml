@@ -61,7 +61,8 @@
         
         <!-- EV Owners Stats -->
         <div class="col-lg-3 col-md-6 mb-3">
-            <div class="card border-0 shadow-sm bg-success text-white">
+            <div class="card border-0 shadow-sm bg-success text-white clickable-card" 
+                 onclick="location.href='@Url.Action("Index", "EVOwnerManagement")'">
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
                         <div>
@@ -79,7 +80,8 @@
         
         <!-- Pending Approvals -->
         <div class="col-lg-3 col-md-6 mb-3">
-            <div class="card border-0 shadow-sm bg-warning text-white">
+            <div class="card border-0 shadow-sm bg-warning text-white clickable-card" 
+                 onclick="location.href='@Url.Action("PendingApprovals", "EVOwnerManagement")'">
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
                         <div>
@@ -134,19 +136,23 @@
                                 <small class="text-muted">Create Backoffice & Operators</small>
                             </div>
                         </a>
-                        <a href="#" class="btn btn-outline-success d-flex align-items-center">
+                        <a href="@Url.Action("Index", "EVOwnerManagement")" class="btn btn-outline-success d-flex align-items-center">
                             <i class="fas fa-users me-3"></i>
                             <div class="text-start">
                                 <div class="fw-semibold">EV Owner Management</div>
                                 <small class="text-muted">View & manage customer accounts</small>
                             </div>
                         </a>
-                        <a href="#" class="btn btn-outline-warning d-flex align-items-center">
+                        <a href="@Url.Action("PendingApprovals", "EVOwnerManagement")" class="btn btn-outline-warning d-flex align-items-center">
                             <i class="fas fa-user-check me-3"></i>
                             <div class="text-start">
                                 <div class="fw-semibold">Approve Registrations</div>
                                 <small class="text-muted">Review pending EV owner requests</small>
                             </div>
+                            @if (ViewBag.PendingApprovals > 0)
+                            {
+                                <span class="badge bg-danger ms-auto">@ViewBag.PendingApprovals</span>
+                            }
                         </a>
                         <a href="#" class="btn btn-outline-info d-flex align-items-center">
                             <i class="fas fa-charging-station me-3"></i>
@@ -211,7 +217,7 @@
                         <div class="alert alert-warning mb-0">
                             <i class="fas fa-exclamation-triangle me-2"></i>
                             <strong>Action Required:</strong> You have @ViewBag.PendingApprovals EV owner registration(s) pending approval.
-                            <a href="#" class="alert-link ms-2">Review Now</a>
+                            <a href="@Url.Action("PendingApprovals", "EVOwnerManagement")" class="alert-link ms-2">Review Now</a>
                         </div>
                     }
                 </div>
@@ -298,5 +304,15 @@
         padding: 15px;
         border-radius: 8px;
         border-left: 3px solid #007bff;
+    }
+
+    .clickable-card {
+        cursor: pointer;
+        transition: transform 0.2s ease-in-out;
+    }
+
+    .clickable-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
     }
 </style>
