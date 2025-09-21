@@ -8,3 +8,6 @@ gradle/wrapper/gradle-wrapper.jar
 *.iml
 *.iws
 *.ipr
+settings.gradle.kts
+build.gradle.kts
+app/build.gradle.kts

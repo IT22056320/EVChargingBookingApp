@@ -1,0 +1,328 @@
+@model List<WebApplicationFrontend.Services.EVOwnerDto>
+@{
+    ViewData["Title"] = ViewBag.Title ?? "EV Owner Management";
+}
+
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-users text-success me-2"></i>
+                        @ViewData["Title"]
+                    </h1>
+                    <p class="text-muted mb-0">Manage EV owner accounts and approvals</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="@Url.Action("Index")" class="btn btn-outline-primary">
+                        <i class="fas fa-users me-1"></i>All Users
+                    </a>
+                    <a href="@Url.Action("PendingApprovals")" class="btn btn-warning">
+                        <i class="fas fa-clock me-1"></i>Pending Approvals
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alerts -->
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle me-2"></i>
+            @TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title opacity-75">Total EV Owners</h6>
+                            <h2 class="mb-0">@Model.Count</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-users fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title opacity-75">Approved</h6>
+                            <h2 class="mb-0">@Model.Count(u => u.IsApproved)</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-user-check fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title opacity-75">Pending</h6>
+                            <h2 class="mb-0">@Model.Count(u => !u.IsApproved)</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-clock fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title opacity-75">Active</h6>
+                            <h2 class="mb-0">@Model.Count(u => u.IsActive)</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-user-shield fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- EV Owners Table -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-transparent border-bottom-0">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-list text-primary me-2"></i>
+                    EV Owners (@Model.Count)
+                </h5>
+                <div class="input-group" style="width: 300px;">
+                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                    <input type="text" class="form-control" placeholder="Search by NIC, name, or email..." id="searchInput">
+                </div>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            @if (Model.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0" id="evOwnersTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th>NIC</th>
+                                <th>Full Name</th>
+                                <th>Email</th>
+                                <th>Phone</th>
+                                <th>Status</th>
+                                <th>Approval</th>
+                                <th>Registered</th>
+                                <th class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var owner in Model.OrderBy(u => u.IsApproved).ThenByDescending(u => u.RegisteredAt))
+                            {
+                                <tr class="@(owner.IsApproved ? "" : "table-warning")">
+                                    <td>
+                                        <strong>@owner.NIC</strong>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 32px; height: 32px;">
+                                                @owner.FullName.FirstOrDefault()
+                                            </div>
+                                            @owner.FullName
+                                        </div>
+                                    </td>
+                                    <td>@owner.Email</td>
+                                    <td>@(string.IsNullOrEmpty(owner.PhoneNumber) ? "N/A" : owner.PhoneNumber)</td>
+                                    <td>
+                                        @if (owner.IsActive)
+                                        {
+                                            <span class="badge bg-success">Active</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Inactive</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (owner.IsApproved)
+                                        {
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-check me-1"></i>Approved
+                                            </span>
+                                            @if (owner.ApprovedAt.HasValue)
+                                            {
+                                                <br><small class="text-muted">@owner.ApprovedAt.Value.ToString("MMM dd, yyyy")</small>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-warning">
+                                                <i class="fas fa-clock me-1"></i>Pending
+                                            </span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">@owner.RegisteredAt.ToString("MMM dd, yyyy HH:mm")</small>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="btn-group" role="group">
+                                            <a href="@Url.Action("Details", new { nic = owner.NIC })" 
+                                               class="btn btn-sm btn-outline-info" title="View Details">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            
+                                            @if (!owner.IsApproved)
+                                            {
+                                                <button type="button" class="btn btn-sm btn-success" 
+                                                        onclick="approveUser('@owner.NIC', '@owner.FullName')" title="Approve">
+                                                    <i class="fas fa-check"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-danger" 
+                                                        onclick="rejectUser('@owner.NIC', '@owner.FullName')" title="Reject">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button type="button" class="btn btn-sm @(owner.IsActive ? "btn-warning" : "btn-success")" 
+                                                        onclick="toggleStatus('@owner.NIC', '@owner.FullName', @owner.IsActive.ToString().ToLower())" 
+                                                        title="@(owner.IsActive ? "Deactivate" : "Activate")">
+                                                    <i class="fas fa-@(owner.IsActive ? "pause" : "play")"></i>
+                                                </button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5">
+                    <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">No EV owners found</h5>
+                    <p class="text-muted">EV owners will appear here once they register via the mobile app.</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Action Forms (Hidden) -->
+<form id="approveForm" method="post" style="display: none;">
+    <input type="hidden" name="nic" id="approveNic">
+</form>
+
+<form id="rejectForm" method="post" style="display: none;">
+    <input type="hidden" name="nic" id="rejectNic">
+</form>
+
+<form id="statusForm" method="post" style="display: none;">
+    <input type="hidden" name="nic" id="statusNic">
+    <input type="hidden" name="isActive" id="statusActive">
+</form>
+
+@section Scripts {
+    <script>
+        // Search functionality
+        document.getElementById('searchInput').addEventListener('keyup', function() {
+            const searchTerm = this.value.toLowerCase();
+            const tableRows = document.querySelectorAll('#evOwnersTable tbody tr');
+            
+            tableRows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchTerm) ? '' : 'none';
+            });
+        });
+
+        // Approve user
+        function approveUser(nic, name) {
+            if (confirm(`Are you sure you want to APPROVE ${name} (${nic})?\n\nThis will allow them to login to the mobile app.`)) {
+                document.getElementById('approveNic').value = nic;
+                document.getElementById('approveForm').action = '@Url.Action("Approve")';
+                document.getElementById('approveForm').submit();
+            }
+        }
+
+        // Reject user
+        function rejectUser(nic, name) {
+            if (confirm(`Are you sure you want to REJECT ${name} (${nic})?\n\nThis action cannot be undone.`)) {
+                document.getElementById('rejectNic').value = nic;
+                document.getElementById('rejectForm').action = '@Url.Action("Reject")';
+                document.getElementById('rejectForm').submit();
+            }
+        }
+
+        // Toggle status
+        function toggleStatus(nic, name, isActive) {
+            const action = isActive ? 'DEACTIVATE' : 'ACTIVATE';
+            const message = isActive ? 
+                `Are you sure you want to DEACTIVATE ${name} (${nic})?\n\nThey will not be able to login until reactivated.` :
+                `Are you sure you want to ACTIVATE ${name} (${nic})?\n\nThey will be able to login to the mobile app.`;
+            
+            if (confirm(message)) {
+                document.getElementById('statusNic').value = nic;
+                document.getElementById('statusActive').value = !isActive;
+                document.getElementById('statusForm').action = '@Url.Action("ToggleStatus")';
+                document.getElementById('statusForm').submit();
+            }
+        }
+
+        // Auto-refresh pending count
+        @if (ViewBag.Title == "Pending Approvals")
+        {
+            <text>
+            // Auto refresh every 30 seconds for pending approvals page
+            setTimeout(function() {
+                location.reload();
+            }, 30000);
+            </text>
+        }
+    </script>
+}
+
+<style>
+    .avatar-sm {
+        font-weight: bold;
+        font-size: 14px;
+    }
+    
+    .table-warning {
+        background-color: rgba(255, 193, 7, 0.1) !important;
+    }
+    
+    .btn-group .btn {
+        margin-right: 2px;
+    }
+    
+    .btn-group .btn:last-child {
+        margin-right: 0;
+    }
+</style>
