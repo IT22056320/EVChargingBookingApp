@@ -16,6 +16,9 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddHttpClient<ApiService>();
 builder.Services.AddScoped<ApiService>();
 
+// Add SignalR client service
+builder.Services.AddSingleton<ISignalRService, SignalRService>();
+
 // Add session support for user authentication
 builder.Services.AddSession(options =>
 {
@@ -50,5 +53,8 @@ app.UseAuthorization();
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Account}/{action=Login}/{id?}");
+
+// Note: SignalR connection will be established when the booking management pages are accessed
+// This prevents startup errors when backend is not running yet
 
 app.Run();

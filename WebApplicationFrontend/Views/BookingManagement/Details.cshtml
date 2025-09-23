@@ -1,0 +1,630 @@
+@model WebApplicationFrontend.Models.BookingResponse
+@{
+    ViewData["Title"] = "Booking Details";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">Booking Details</h1>
+                <a href="@Url.Action("Index", "BookingManagement")" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to List
+                </a>
+            </div>
+
+            <!-- Booking Information -->
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Booking Information</h5>
+                            @{
+                                var statusClass = Model.Status switch
+                                {
+                                    0 => "badge-warning",
+                                    1 => "badge-success",
+                                    2 => "badge-primary",
+                                    3 => "badge-danger",
+                                    4 => "badge-dark",
+                                    _ => "badge-secondary"
+                                };
+                                var statusText = Model.Status switch
+                                {
+                                    0 => "Pending",
+                                    1 => "Approved",
+                                    2 => "Completed",
+                                    3 => "Cancelled",
+                                    4 => "Rejected",
+                                    _ => "Unknown"
+                                };
+                            }
+                            <span class="badge @statusClass badge-lg">@statusText</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <table class="table table-borderless">
+                                        <tr>
+                                            <th width="40%">Booking ID:</th>
+                                            <td>@Model.Id</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Booking Date:</th>
+                                            <td>@Model.BookingDate.ToString("MMMM dd, yyyy")</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Start Time:</th>
+                                            <td>@Model.StartTime.ToString("MMMM dd, yyyy HH:mm")</td>
+                                        </tr>
+                                        <tr>
+                                            <th>End Time:</th>
+                                            <td>@Model.EndTime.ToString("MMMM dd, yyyy HH:mm")</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Duration:</th>
+                                            <td>@Model.DurationMinutes minutes (@((Model.DurationMinutes / 60.0).ToString("F1")) hours)</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Vehicle Number:</th>
+                                            <td><strong>@Model.VehicleNumber</strong></td>
+                                        </tr>
+                                        @if (!string.IsNullOrEmpty(Model.VehicleType))
+                                        {
+                                            <tr>
+                                                <th>Vehicle Type:</th>
+                                                <td>@Model.VehicleType</td>
+                                            </tr>
+                                        }
+                                    </table>
+                                </div>
+                                <div class="col-md-6">
+                                    <table class="table table-borderless">
+                                        <tr>
+                                            <th width="40%">Created:</th>
+                                            <td>@Model.CreatedAt.ToString("MMMM dd, yyyy HH:mm")</td>
+                                        </tr>
+                                        @if (Model.ModifiedAt.HasValue)
+                                        {
+                                            <tr>
+                                                <th>Modified:</th>
+                                                <td>@Model.ModifiedAt.Value.ToString("MMMM dd, yyyy HH:mm")</td>
+                                            </tr>
+                                        }
+                                        @if (Model.EstimatedChargingTimeMinutes > 0)
+                                        {
+                                            <tr>
+                                                <th>Est. Charging Time:</th>
+                                                <td>@Model.EstimatedChargingTimeMinutes minutes</td>
+                                            </tr>
+                                        }
+                                        @if (Model.TotalCost.HasValue)
+                                        {
+                                            <tr>
+                                                <th>Total Cost:</th>
+                                                <td><strong>$@Model.TotalCost.Value.ToString("F2")</strong></td>
+                                            </tr>
+                                        }
+                                        @if (Model.EnergyConsumedKWh.HasValue)
+                                        {
+                                            <tr>
+                                                <th>Energy Consumed:</th>
+                                                <td>@Model.EnergyConsumedKWh.Value.ToString("F2") kWh</td>
+                                            </tr>
+                                        }
+                                    </table>
+                                </div>
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(Model.Notes))
+                            {
+                                <div class="mt-3">
+                                    <h6>Notes:</h6>
+                                    <p class="text-muted">@Model.Notes</p>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- User Information -->
+                    @if (Model.User != null)
+                    {
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">User Information</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <table class="table table-borderless">
+                                            <tr>
+                                                <th width="30%">Name:</th>
+                                                <td>@Model.User.FullName</td>
+                                            </tr>
+                                            <tr>
+                                                <th>NIC:</th>
+                                                <td>@Model.User.NIC</td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <table class="table table-borderless">
+                                            <tr>
+                                                <th width="30%">Email:</th>
+                                                <td>@Model.User.Email</td>
+                                            </tr>
+                                            <tr>
+                                                <th>Phone:</th>
+                                                <td>@Model.User.PhoneNumber</td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Charging Station Information -->
+                    @if (Model.ChargingStation != null)
+                    {
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">Charging Station Information</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <table class="table table-borderless">
+                                            <tr>
+                                                <th width="40%">Station Name:</th>
+                                                <td><strong>@Model.ChargingStation.StationName</strong></td>
+                                            </tr>
+                                            <tr>
+                                                <th>Location:</th>
+                                                <td>@Model.ChargingStation.Location</td>
+                                            </tr>
+                                            <tr>
+                                                <th>Address:</th>
+                                                <td>@Model.ChargingStation.Address</td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <table class="table table-borderless">
+                                            <tr>
+                                                <th width="40%">Power Rating:</th>
+                                                <td>@Model.ChargingStation.PowerRatingKW kW</td>
+                                            </tr>
+                                            <tr>
+                                                <th>Price per kWh:</th>
+                                                <td>$@Model.ChargingStation.PricePerKWh.ToString("F2")</td>
+                                            </tr>
+                                            <tr>
+                                                <th>Connector Type:</th>
+                                                <td>
+                                                    @(Model.ChargingStation.ConnectorType switch
+                                                    {
+                                                        0 => "Type 1",
+                                                        1 => "Type 2",
+                                                        2 => "CHAdeMO",
+                                                        3 => "CCS",
+                                                        4 => "Tesla",
+                                                        _ => "Unknown"
+                                                    })
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <!-- Actions Panel -->
+                <div class="col-lg-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Actions</h5>
+                        </div>
+                        <div class="card-body">
+                            @if (Model.Status == 0)
+                            {
+                                <!-- Pending status actions -->
+                                <button type="button" class="btn btn-success btn-block mb-2" onclick="approveBooking('@Model.Id')">
+                                    <i class="fas fa-check"></i> Approve Booking
+                                </button>
+                                <button type="button" class="btn btn-danger btn-block mb-2" onclick="showRejectModal('@Model.Id')">
+                                    <i class="fas fa-times"></i> Reject Booking
+                                </button>
+                            }
+
+                            @if (Model.Status == 1)
+                            {
+                                <!-- Approved status actions -->
+                                @if (!string.IsNullOrEmpty(Model.QRCode))
+                                {
+                                    <a href="@Url.Action("QRCode", new { id = Model.Id })" class="btn btn-info btn-block mb-2" target="_blank">
+                                        <i class="fas fa-qrcode"></i> View QR Code
+                                    </a>
+                                }
+                                <button type="button" class="btn btn-primary btn-block mb-2" onclick="showCompleteModal('@Model.Id')">
+                                    <i class="fas fa-flag-checkered"></i> Mark as Completed
+                                </button>
+                            }
+
+                            @if (Model.CanBeCancelled)
+                            {
+                                <button type="button" class="btn btn-outline-danger btn-block mb-2" onclick="showCancelModal('@Model.Id')">
+                                    <i class="fas fa-ban"></i> Cancel Booking
+                                </button>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Status History -->
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Status History</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="timeline">
+                                <div class="timeline-item">
+                                    <div class="timeline-marker bg-primary"></div>
+                                    <div class="timeline-content">
+                                        <h6 class="mb-1">Created</h6>
+                                        <p class="mb-0 text-muted">@Model.CreatedAt.ToString("MMM dd, yyyy HH:mm")</p>
+                                    </div>
+                                </div>
+
+                                @if (Model.ApprovedAt.HasValue)
+                                {
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker bg-success"></div>
+                                        <div class="timeline-content">
+                                            <h6 class="mb-1">Approved</h6>
+                                            <p class="mb-0 text-muted">@Model.ApprovedAt.Value.ToString("MMM dd, yyyy HH:mm")</p>
+                                            @if (!string.IsNullOrEmpty(Model.ApprovedBy))
+                                            {
+                                                <small class="text-muted">by @Model.ApprovedBy</small>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+
+                                @if (Model.CompletedAt.HasValue)
+                                {
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker bg-primary"></div>
+                                        <div class="timeline-content">
+                                            <h6 class="mb-1">Completed</h6>
+                                            <p class="mb-0 text-muted">@Model.CompletedAt.Value.ToString("MMM dd, yyyy HH:mm")</p>
+                                        </div>
+                                    </div>
+                                }
+
+                                @if (Model.CancelledAt.HasValue)
+                                {
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker bg-danger"></div>
+                                        <div class="timeline-content">
+                                            <h6 class="mb-1">Cancelled</h6>
+                                            <p class="mb-0 text-muted">@Model.CancelledAt.Value.ToString("MMM dd, yyyy HH:mm")</p>
+                                            @if (!string.IsNullOrEmpty(Model.CancelledBy))
+                                            {
+                                                <small class="text-muted">by @Model.CancelledBy</small>
+                                            }
+                                            @if (!string.IsNullOrEmpty(Model.CancellationReason))
+                                            {
+                                                <p class="mt-1 mb-0"><small>Reason: @Model.CancellationReason</small></p>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+
+                                @if (Model.RejectedAt.HasValue)
+                                {
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker bg-dark"></div>
+                                        <div class="timeline-content">
+                                            <h6 class="mb-1">Rejected</h6>
+                                            <p class="mb-0 text-muted">@Model.RejectedAt.Value.ToString("MMM dd, yyyy HH:mm")</p>
+                                            @if (!string.IsNullOrEmpty(Model.RejectedBy))
+                                            {
+                                                <small class="text-muted">by @Model.RejectedBy</small>
+                                            }
+                                            @if (!string.IsNullOrEmpty(Model.RejectionReason))
+                                            {
+                                                <p class="mt-1 mb-0"><small>Reason: @Model.RejectionReason</small></p>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modals will be included inline -->
+<!-- Reject Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Reject Booking</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="rejectForm">
+                    <input type="hidden" id="rejectBookingId">
+                    <div class="form-group">
+                        <label for="rejectReason">Rejection Reason <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="rejectReason" rows="3" required 
+                                  placeholder="Please provide a reason for rejection..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="rejectBooking()">Reject Booking</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cancel Modal -->
+<div class="modal fade" id="cancelModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Cancel Booking</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="cancelForm">
+                    <input type="hidden" id="cancelBookingId">
+                    <div class="form-group">
+                        <label for="cancelReason">Cancellation Reason <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="cancelReason" rows="3" required 
+                                  placeholder="Please provide a reason for cancellation..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="cancelBooking()">Cancel Booking</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Complete Modal -->
+<div class="modal fade" id="completeModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Complete Booking</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="completeForm">
+                    <input type="hidden" id="completeBookingId">
+                    <div class="form-group">
+                        <label for="totalCost">Total Cost (optional)</label>
+                        <input type="number" class="form-control" id="totalCost" step="0.01" min="0" 
+                               placeholder="Enter total cost...">
+                    </div>
+                    <div class="form-group">
+                        <label for="energyConsumed">Energy Consumed (kWh) (optional)</label>
+                        <input type="number" class="form-control" id="energyConsumed" step="0.01" min="0" 
+                               placeholder="Enter energy consumed...">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="completeBooking()">Complete Booking</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+    <style>
+        .timeline {
+            position: relative;
+            padding-left: 30px;
+        }
+
+        .timeline-item {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .timeline-marker {
+            position: absolute;
+            left: -30px;
+            top: 5px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .timeline-content {
+            padding-left: 10px;
+        }
+
+        .badge-lg {
+            font-size: 0.9rem;
+            padding: 0.5rem 0.75rem;
+        }
+    </style>
+}
+
+@section Scripts {
+    <script>
+        const currentUser = '@(Context.Session.GetString("UserName") ?? "System")';
+
+        function approveBooking(bookingId) {
+            if (confirm('Are you sure you want to approve this booking?')) {
+                fetch('@Url.Action("Approve", "BookingManagement")', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                    },
+                    body: JSON.stringify({
+                        id: bookingId,
+                        approvedBy: currentUser
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while approving the booking.');
+                });
+            }
+        }
+
+        function showRejectModal(bookingId) {
+            document.getElementById('rejectBookingId').value = bookingId;
+            document.getElementById('rejectReason').value = '';
+            $('#rejectModal').modal('show');
+        }
+
+        function showCancelModal(bookingId) {
+            document.getElementById('cancelBookingId').value = bookingId;
+            document.getElementById('cancelReason').value = '';
+            $('#cancelModal').modal('show');
+        }
+
+        function showCompleteModal(bookingId) {
+            document.getElementById('completeBookingId').value = bookingId;
+            document.getElementById('totalCost').value = '';
+            document.getElementById('energyConsumed').value = '';
+            $('#completeModal').modal('show');
+        }
+
+        function rejectBooking() {
+            const bookingId = document.getElementById('rejectBookingId').value;
+            const reason = document.getElementById('rejectReason').value;
+
+            if (!reason.trim()) {
+                alert('Please provide a rejection reason.');
+                return;
+            }
+
+            fetch('@Url.Action("Reject", "BookingManagement")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                },
+                body: JSON.stringify({
+                    id: bookingId,
+                    rejectedBy: currentUser,
+                    reason: reason
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                $('#rejectModal').modal('hide');
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while rejecting the booking.');
+            });
+        }
+
+        function cancelBooking() {
+            const bookingId = document.getElementById('cancelBookingId').value;
+            const reason = document.getElementById('cancelReason').value;
+
+            if (!reason.trim()) {
+                alert('Please provide a cancellation reason.');
+                return;
+            }
+
+            fetch('@Url.Action("Cancel", "BookingManagement")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                },
+                body: JSON.stringify({
+                    id: bookingId,
+                    cancelledBy: currentUser,
+                    reason: reason
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                $('#cancelModal').modal('hide');
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while cancelling the booking.');
+            });
+        }
+
+        function completeBooking() {
+            const bookingId = document.getElementById('completeBookingId').value;
+            const totalCost = document.getElementById('totalCost').value;
+            const energyConsumed = document.getElementById('energyConsumed').value;
+
+            fetch('@Url.Action("Complete", "BookingManagement")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                },
+                body: JSON.stringify({
+                    id: bookingId,
+                    totalCost: totalCost ? parseFloat(totalCost) : null,
+                    energyConsumed: energyConsumed ? parseFloat(energyConsumed) : null
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                $('#completeModal').modal('hide');
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while completing the booking.');
+            });
+        }
+    </script>
+}
