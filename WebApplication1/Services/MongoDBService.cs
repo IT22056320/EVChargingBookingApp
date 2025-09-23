@@ -38,6 +38,18 @@ namespace WebApplication1.Services
         public IMongoCollection<WebUser> WebUsers =>
             _database.GetCollection<WebUser>("webusers");
 
+        /// <summary>
+        /// Collection for EV Charging Bookings
+        /// </summary>
+        public IMongoCollection<Booking> Bookings =>
+            _database.GetCollection<Booking>("bookings");
+
+        /// <summary>
+        /// Collection for Charging Stations
+        /// </summary>
+        public IMongoCollection<ChargingStation> ChargingStations =>
+            _database.GetCollection<ChargingStation>("chargingstations");
+
         // Keep the old Users collection for backward compatibility during transition
         public IMongoCollection<User> Users =>
             _database.GetCollection<User>("users");

@@ -1,0 +1,619 @@
+@model WebApplicationFrontend.Models.BookingManagementViewModel
+@{
+    ViewData["Title"] = "Booking Management";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">Booking Management</h1>
+                <div>
+                    <a href="@Url.Action("Statistics", "BookingManagement")" class="btn btn-info">
+                        <i class="fas fa-chart-bar"></i> Statistics
+                    </a>
+                    <button type="button" class="btn btn-success" onclick="exportBookings()">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filter Section -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#filterCollapse">
+                            <i class="fas fa-filter"></i> Filters
+                        </button>
+                    </h5>
+                </div>
+                <div id="filterCollapse" class="collapse @((!string.IsNullOrEmpty(Model.SearchTerm) || Model.FromDate.HasValue || Model.ToDate.HasValue || Model.CurrentStatus != "all") ? "show" : "")">
+                    <div class="card-body">
+                        <form method="get" action="@Url.Action("Index")">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="status">Status</label>
+                                        <select name="status" id="status" class="form-control">
+                                            <option value="all" selected="@(Model.CurrentStatus == "all")">All Status</option>
+                                            <option value="0" selected="@(Model.CurrentStatus == "0")">Pending</option>
+                                            <option value="1" selected="@(Model.CurrentStatus == "1")">Approved</option>
+                                            <option value="2" selected="@(Model.CurrentStatus == "2")">Completed</option>
+                                            <option value="3" selected="@(Model.CurrentStatus == "3")">Cancelled</option>
+                                            <option value="4" selected="@(Model.CurrentStatus == "4")">Rejected</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="searchTerm">Search</label>
+                                        <input type="text" name="searchTerm" id="searchTerm" class="form-control" 
+                                               placeholder="Vehicle number, user name, or NIC" value="@Model.SearchTerm">
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="form-group">
+                                        <label for="fromDate">From Date</label>
+                                        <input type="date" name="fromDate" id="fromDate" class="form-control" 
+                                               value="@(Model.FromDate?.ToString("yyyy-MM-dd"))">
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="form-group">
+                                        <label for="toDate">To Date</label>
+                                        <input type="date" name="toDate" id="toDate" class="form-control" 
+                                               value="@(Model.ToDate?.ToString("yyyy-MM-dd"))">
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="form-group">
+                                        <label>&nbsp;</label>
+                                        <div>
+                                            <button type="submit" class="btn btn-primary btn-block">
+                                                <i class="fas fa-search"></i> Search
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            @if (Model.Bookings.Any(b => b.Status == 0))
+            {
+                <!-- Bulk Actions for Pending bookings -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <button type="button" class="btn btn-success" onclick="bulkApprove()" id="bulkApproveBtn" disabled>
+                                    <i class="fas fa-check"></i> Bulk Approve Selected
+                                </button>
+                                <button type="button" class="btn btn-secondary ml-2" onclick="selectAllPending()">
+                                    Select All Pending
+                                </button>
+                            </div>
+                            <div class="col-md-6 text-right">
+                                <span id="selectedCount">0</span> bookings selected
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <!-- Results Summary -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <p class="mb-0">
+                    Showing @((Model.Page - 1) * Model.PageSize + 1) to @(Math.Min(Model.Page * Model.PageSize, Model.TotalCount)) 
+                    of @Model.TotalCount total bookings
+                </p>
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-toggle="dropdown">
+                        @Model.PageSize per page
+                    </button>
+                    <div class="dropdown-menu">
+                        <a class="dropdown-item" href="@Url.Action("Index", new { pageSize = 10, status = Model.CurrentStatus, searchTerm = Model.SearchTerm, fromDate = Model.FromDate, toDate = Model.ToDate })">10 per page</a>
+                        <a class="dropdown-item" href="@Url.Action("Index", new { pageSize = 20, status = Model.CurrentStatus, searchTerm = Model.SearchTerm, fromDate = Model.FromDate, toDate = Model.ToDate })">20 per page</a>
+                        <a class="dropdown-item" href="@Url.Action("Index", new { pageSize = 50, status = Model.CurrentStatus, searchTerm = Model.SearchTerm, fromDate = Model.FromDate, toDate = Model.ToDate })">50 per page</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bookings Table -->
+            <div class="card">
+                <div class="card-body p-0">
+                    @if (Model.Bookings.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>
+                                            <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+                                        </th>
+                                        <th>Booking ID</th>
+                                        <th>User</th>
+                                        <th>Station</th>
+                                        <th>Vehicle</th>
+                                        <th>Date & Time</th>
+                                        <th>Status</th>
+                                        <th>Created</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var booking in Model.Bookings)
+                                    {
+                                        <tr>
+                                            <td>
+                                                @if (booking.Status == 0)
+                                                {
+                                                    <!-- Pending status checkbox -->
+                                                    <input type="checkbox" class="booking-checkbox" value="@booking.Id" onchange="updateSelectedCount()">
+                                                }
+                                            </td>
+                                            <td>
+                                                <a href="@Url.Action("Details", new { id = booking.Id })" class="text-decoration-none">
+                                                    @booking.Id.Substring(booking.Id.Length - 8)
+                                                </a>
+                                            </td>
+                                            <td>
+                                                <div>
+                                                    <strong>@(booking.User?.FullName ?? "N/A")</strong><br>
+                                                    <small class="text-muted">@(booking.User?.NIC ?? "N/A")</small>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div>
+                                                    <strong>@(booking.ChargingStation?.StationName ?? "N/A")</strong><br>
+                                                    <small class="text-muted">@(booking.ChargingStation?.Location ?? "N/A")</small>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div>
+                                                    <strong>@booking.VehicleNumber</strong><br>
+                                                    <small class="text-muted">@booking.VehicleType</small>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div>
+                                                    <strong>@booking.BookingDate.ToString("MMM dd, yyyy")</strong><br>
+                                                    <small class="text-muted">@booking.StartTime.ToString("HH:mm") - @booking.EndTime.ToString("HH:mm")</small>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                @{
+                                                    var statusClass = booking.Status switch
+                                                    {
+                                                        0 => "badge-warning",
+                                                        1 => "badge-success",
+                                                        2 => "badge-primary",
+                                                        3 => "badge-danger",
+                                                        4 => "badge-dark",
+                                                        _ => "badge-secondary"
+                                                    };
+                                                    var statusText = booking.Status switch
+                                                    {
+                                                        0 => "Pending",
+                                                        1 => "Approved",
+                                                        2 => "Completed",
+                                                        3 => "Cancelled",
+                                                        4 => "Rejected",
+                                                        _ => "Unknown"
+                                                    };
+                                                }
+                                                <span class="badge @statusClass">@statusText</span>
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">@booking.CreatedAt.ToString("MMM dd, HH:mm")</small>
+                                            </td>
+                                            <td>
+                                                <div class="btn-group" role="group">
+                                                    <a href="@Url.Action("Details", new { id = booking.Id })" 
+                                                       class="btn btn-sm btn-outline-info">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    
+                                                    @if (booking.Status == 0) // Pending
+                                                    {
+                                                        <button type="button" class="btn btn-sm btn-success" 
+                                                                onclick="approveBooking('@booking.Id')">
+                                                            <i class="fas fa-check"></i>
+                                                        </button>
+                                                        <button type="button" class="btn btn-sm btn-danger" 
+                                                                onclick="showRejectModal('@booking.Id')">
+                                                            <i class="fas fa-times"></i>
+                                                        </button>
+                                                    }
+                                                    
+                                                    @if (booking.Status == 1 && !string.IsNullOrEmpty(booking.QRCode)) // Approved with QR
+                                                    {
+                                                        <a href="@Url.Action("QRCode", new { id = booking.Id })" 
+                                                           class="btn btn-sm btn-outline-secondary" target="_blank">
+                                                            <i class="fas fa-qrcode"></i>
+                                                        </a>
+                                                    }
+                                                    
+                                                    @if (booking.CanBeCancelled)
+                                                    {
+                                                        <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                                onclick="showCancelModal('@booking.Id')">
+                                                            <i class="fas fa-ban"></i>
+                                                        </button>
+                                                    }
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5">
+                            <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No bookings found</h5>
+                            <p class="text-muted">Try adjusting your search criteria or filters.</p>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Pagination -->
+            @if (Model.TotalPages > 1)
+            {
+                <nav aria-label="Booking pagination" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        @if (Model.HasPreviousPage)
+                        {
+                            <li class="page-item">
+                                <a class="page-link" href="@Url.Action("Index", new { page = Model.Page - 1, pageSize = Model.PageSize, status = Model.CurrentStatus, searchTerm = Model.SearchTerm, fromDate = Model.FromDate, toDate = Model.ToDate })">
+                                    Previous
+                                </a>
+                            </li>
+                        }
+
+                        @for (int i = Math.Max(1, Model.Page - 2); i <= Math.Min(Model.TotalPages, Model.Page + 2); i++)
+                        {
+                            <li class="page-item @(i == Model.Page ? "active" : "")">
+                                <a class="page-link" href="@Url.Action("Index", new { page = i, pageSize = Model.PageSize, status = Model.CurrentStatus, searchTerm = Model.SearchTerm, fromDate = Model.FromDate, toDate = Model.ToDate })">
+                                    @i
+                                </a>
+                            </li>
+                        }
+
+                        @if (Model.HasNextPage)
+                        {
+                            <li class="page-item">
+                                <a class="page-link" href="@Url.Action("Index", new { page = Model.Page + 1, pageSize = Model.PageSize, status = Model.CurrentStatus, searchTerm = Model.SearchTerm, fromDate = Model.FromDate, toDate = Model.ToDate })">
+                                    Next
+                                </a>
+                            </li>
+                        }
+                    </ul>
+                </nav>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Reject Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Reject Booking</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="rejectForm">
+                    <input type="hidden" id="rejectBookingId">
+                    <div class="form-group">
+                        <label for="rejectReason">Rejection Reason <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="rejectReason" rows="3" required 
+                                  placeholder="Please provide a reason for rejection..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="rejectBooking()">Reject Booking</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cancel Modal -->
+<div class="modal fade" id="cancelModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Cancel Booking</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="cancelForm">
+                    <input type="hidden" id="cancelBookingId">
+                    <div class="form-group">
+                        <label for="cancelReason">Cancellation Reason <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="cancelReason" rows="3" required 
+                                  placeholder="Please provide a reason for cancellation..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="cancelBooking()">Cancel Booking</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Current user (should be set from session or auth)
+        const currentUser = '@(Context.Session.GetString("UserName") ?? "System")';
+
+        function updateSelectedCount() {
+            const checkboxes = document.querySelectorAll('.booking-checkbox:checked');
+            const count = checkboxes.length;
+            document.getElementById('selectedCount').textContent = count;
+            document.getElementById('bulkApproveBtn').disabled = count === 0;
+        }
+
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('selectAll');
+            const checkboxes = document.querySelectorAll('.booking-checkbox');
+            checkboxes.forEach(cb => cb.checked = selectAll.checked);
+            updateSelectedCount();
+        }
+
+        function selectAllPending() {
+            const checkboxes = document.querySelectorAll('.booking-checkbox');
+            checkboxes.forEach(cb => cb.checked = true);
+            document.getElementById('selectAll').checked = true;
+            updateSelectedCount();
+        }
+
+        function approveBooking(bookingId) {
+            if (confirm('Are you sure you want to approve this booking?')) {
+                fetch('@Url.Action("Approve")', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                    },
+                    body: JSON.stringify({
+                        id: bookingId,
+                        approvedBy: currentUser
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while approving the booking.');
+                });
+            }
+        }
+
+        function showRejectModal(bookingId) {
+            document.getElementById('rejectBookingId').value = bookingId;
+            document.getElementById('rejectReason').value = '';
+            $('#rejectModal').modal('show');
+        }
+
+        function rejectBooking() {
+            const bookingId = document.getElementById('rejectBookingId').value;
+            const reason = document.getElementById('rejectReason').value;
+
+            if (!reason.trim()) {
+                alert('Please provide a rejection reason.');
+                return;
+            }
+
+            fetch('@Url.Action("Reject")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                },
+                body: JSON.stringify({
+                    id: bookingId,
+                    rejectedBy: currentUser,
+                    reason: reason
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                $('#rejectModal').modal('hide');
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while rejecting the booking.');
+            });
+        }
+
+        function showCancelModal(bookingId) {
+            document.getElementById('cancelBookingId').value = bookingId;
+            document.getElementById('cancelReason').value = '';
+            $('#cancelModal').modal('show');
+        }
+
+        function cancelBooking() {
+            const bookingId = document.getElementById('cancelBookingId').value;
+            const reason = document.getElementById('cancelReason').value;
+
+            if (!reason.trim()) {
+                alert('Please provide a cancellation reason.');
+                return;
+            }
+
+            fetch('@Url.Action("Cancel")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                },
+                body: JSON.stringify({
+                    id: bookingId,
+                    cancelledBy: currentUser,
+                    reason: reason
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                $('#cancelModal').modal('hide');
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while cancelling the booking.');
+            });
+        }
+
+        function bulkApprove() {
+            const checkboxes = document.querySelectorAll('.booking-checkbox:checked');
+            const bookingIds = Array.from(checkboxes).map(cb => cb.value);
+
+            if (bookingIds.length === 0) {
+                alert('Please select bookings to approve.');
+                return;
+            }
+
+            if (confirm(`Are you sure you want to approve ${bookingIds.length} booking(s)?`)) {
+                fetch('@Url.Action("BulkApprove")', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                    },
+                    body: JSON.stringify({
+                        bookingIds: bookingIds,
+                        approvedBy: currentUser
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred during bulk approval.');
+                });
+            }
+        }
+
+        function exportBookings() {
+            const currentParams = new URLSearchParams(window.location.search);
+            const exportUrl = '@Url.Action("Export")?' + currentParams.toString();
+            window.location.href = exportUrl;
+        }
+
+        // SignalR Real-time Updates
+        let connection = null;
+
+        async function initializeSignalR() {
+            try {
+                connection = new signalR.HubConnectionBuilder()
+                    .withUrl("http://localhost:5001/bookingNotificationHub")
+                    .withAutomaticReconnect([0, 2000, 10000, 30000])
+                    .build();
+
+                // Register event handlers
+                connection.on("BookingStatusChanged", function (notification) {
+                    console.log("Booking status changed:", notification);
+                    showNotification(`Booking ${notification.BookingId} status changed to ${notification.NewStatus}`, "info");
+                    setTimeout(() => location.reload(), 1000);
+                });
+
+                connection.on("BookingCreated", function (notification) {
+                    console.log("New booking created:", notification);
+                    showNotification("New booking created", "success");
+                    setTimeout(() => location.reload(), 1000);
+                });
+
+                connection.on("BookingUpdated", function (notification) {
+                    console.log("Booking updated:", notification);
+                    showNotification(`Booking ${notification.BookingId} updated`, "info");
+                    setTimeout(() => location.reload(), 1000);
+                });
+
+                connection.on("BookingDeleted", function (notification) {
+                    console.log("Booking deleted:", notification);
+                    showNotification(`Booking ${notification.BookingId} deleted`, "warning");
+                    setTimeout(() => location.reload(), 1000);
+                });
+
+                connection.on("BulkStatusUpdate", function (notification) {
+                    console.log("Bulk status update:", notification);
+                    showNotification(`${notification.Count} bookings updated to ${notification.NewStatus}`, "success");
+                    setTimeout(() => location.reload(), 1000);
+                });
+
+                await connection.start();
+                console.log("SignalR connection started");
+                showNotification("Real-time updates connected", "success");
+
+            } catch (error) {
+                console.error("SignalR connection failed:", error);
+                showNotification("Real-time updates unavailable", "warning");
+            }
+        }
+
+        function showNotification(message, type) {
+            const alertClass = type === 'success' ? 'alert-success' :
+                              type === 'warning' ? 'alert-warning' :
+                              type === 'error' ? 'alert-danger' : 'alert-info';
+
+            const notification = `
+                <div class="alert ${alertClass} alert-dismissible fade show position-fixed" 
+                     style="top: 20px; right: 20px; z-index: 9999; min-width: 300px;" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+
+            document.body.insertAdjacentHTML('afterbegin', notification);
+            
+            // Auto-dismiss after 5 seconds
+            setTimeout(() => {
+                const alert = document.querySelector('.alert');
+                if (alert) alert.remove();
+            }, 5000);
+        }
+
+        // Initialize SignalR when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeSignalR();
+        });
+    </script>
+    <script src="https://unpkg.com/&#64;microsoft/signalr@latest/dist/browser/signalr.min.js"></script>
+}

@@ -21,7 +21,7 @@ namespace WebApplicationFrontend.Services
         public ApiService(HttpClient httpClient, IConfiguration configuration)
         {
             _httpClient = httpClient;
-            _baseUrl = configuration["ApiSettings:BaseUrl"] ?? "https://localhost:7180/api";
+            _baseUrl = configuration["ApiSettings:BaseUrl"] ?? "https://localhost:7001/api";
         }
 
         /// <summary>
@@ -213,6 +213,154 @@ namespace WebApplicationFrontend.Services
             catch
             {
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// Generic GET method
+        /// </summary>
+        public async Task<T?> GetAsync<T>(string endpoint, Dictionary<string, string?>? queryParams = null)
+        {
+            try
+            {
+                var url = $"{_baseUrl}/{endpoint.TrimStart('/')}";
+                
+                if (queryParams?.Any() == true)
+                {
+                    var query = string.Join("&", queryParams
+                        .Where(kvp => !string.IsNullOrEmpty(kvp.Value))
+                        .Select(kvp => $"{kvp.Key}={Uri.EscapeDataString(kvp.Value!)}"));
+                    
+                    if (!string.IsNullOrEmpty(query))
+                    {
+                        url += $"?{query}";
+                    }
+                }
+
+                var response = await _httpClient.GetAsync(url);
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    var result = JsonSerializer.Deserialize<T>(content, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                    return result;
+                }
+                return default(T);
+            }
+            catch
+            {
+                return default(T);
+            }
+        }
+
+        /// <summary>
+        /// Generic POST method
+        /// </summary>
+        public async Task<T?> PostAsync<T>(string endpoint, object data)
+        {
+            try
+            {
+                var json = JsonSerializer.Serialize(data);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await _httpClient.PostAsync($"{_baseUrl}/{endpoint.TrimStart('/')}", content);
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    var result = JsonSerializer.Deserialize<T>(responseContent, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                    return result;
+                }
+                return default(T);
+            }
+            catch
+            {
+                return default(T);
+            }
+        }
+
+        /// <summary>
+        /// Generic PUT method
+        /// </summary>
+        public async Task<T?> PutAsync<T>(string endpoint, object data)
+        {
+            try
+            {
+                var json = JsonSerializer.Serialize(data);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await _httpClient.PutAsync($"{_baseUrl}/{endpoint.TrimStart('/')}", content);
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    var result = JsonSerializer.Deserialize<T>(responseContent, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                    return result;
+                }
+                return default(T);
+            }
+            catch
+            {
+                return default(T);
+            }
+        }
+
+        /// <summary>
+        /// Generic PATCH method
+        /// </summary>
+        public async Task<T?> PatchAsync<T>(string endpoint, object data)
+        {
+            try
+            {
+                var json = JsonSerializer.Serialize(data);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var request = new HttpRequestMessage(HttpMethod.Patch, $"{_baseUrl}/{endpoint.TrimStart('/')}")
+                {
+                    Content = content
+                };
+
+                var response = await _httpClient.SendAsync(request);
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    var result = JsonSerializer.Deserialize<T>(responseContent, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                    return result;
+                }
+                return default(T);
+            }
+            catch
+            {
+                return default(T);
+            }
+        }
+
+        /// <summary>
+        /// Get file as byte array
+        /// </summary>
+        public async Task<byte[]?> GetFileAsync(string endpoint)
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync($"{_baseUrl}/{endpoint.TrimStart('/')}");
+                if (response.IsSuccessStatusCode)
+                {
+                    return await response.Content.ReadAsByteArrayAsync();
+                }
+                return null;
+            }
+            catch
+            {
+                return null;
             }
         }
     }

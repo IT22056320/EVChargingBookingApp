@@ -1,4 +1,5 @@
 using WebApplication1.Services;
+using WebApplication1.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,16 +8,25 @@ builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// Register MongoDB and custom services
 builder.Services.AddSingleton<MongoDBService>();
+builder.Services.AddScoped<BookingService>();
+builder.Services.AddScoped<QRCodeService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+
+// Add SignalR
+builder.Services.AddSignalR();
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowWebApp",
         policy =>
         {
-            policy.AllowAnyOrigin()
-            .AllowAnyHeader()
-            .AllowAnyMethod();
+            policy.WithOrigins("https://localhost:7000", "http://localhost:5000")
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials(); // Required for SignalR
         });
 });
 
@@ -37,5 +47,8 @@ app.UseCors("AllowWebApp");
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Map SignalR hub
+app.MapHub<BookingNotificationHub>("/bookingNotificationHub");
 
 app.Run();
