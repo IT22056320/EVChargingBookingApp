@@ -23,7 +23,13 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowWebApp",
         policy =>
         {
-            policy.WithOrigins("https://localhost:7000", "http://localhost:5000")
+            policy.WithOrigins(
+                    "https://localhost:7000", 
+                    "http://localhost:5000",
+                    "http://localhost:3000",
+                    "http://localhost:3001",
+                    "http://localhost:3002"
+                  )
                   .AllowAnyHeader()
                   .AllowAnyMethod()
                   .AllowCredentials(); // Required for SignalR
@@ -39,7 +45,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// Only use HTTPS redirection in production
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 // Enable CORS
 app.UseCors("AllowWebApp");
