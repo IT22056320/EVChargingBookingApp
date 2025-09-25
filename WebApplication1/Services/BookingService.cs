@@ -18,15 +18,18 @@ namespace WebApplication1.Services
     public class BookingService
     {
         private readonly MongoDBService _mongoDBService;
+        private readonly BookingNumberService _bookingNumberService;
         private readonly INotificationService _notificationService;
         private readonly ILogger<BookingService> _logger;
 
         public BookingService(
-            MongoDBService mongoDBService, 
+            MongoDBService mongoDBService,
+            BookingNumberService bookingNumberService,
             INotificationService notificationService,
             ILogger<BookingService> logger)
         {
             _mongoDBService = mongoDBService;
+            _bookingNumberService = bookingNumberService;
             _notificationService = notificationService;
             _logger = logger;
         }
@@ -45,8 +48,37 @@ namespace WebApplication1.Services
                     return (false, validationResult.Message, null);
                 }
 
+                // Check for booking conflicts
+                var hasConflict = await HasBookingConflictAsync(
+                    createBookingDto.ChargingStationId,
+                    createBookingDto.StartTime,
+                    createBookingDto.EndTime
+                );
+
+                if (hasConflict)
+                {
+                    return (false, "The selected time slot conflicts with an existing booking. Please choose a different time.", null);
+                }
+
+                // Generate unique booking number
+                var bookingNumber = await _bookingNumberService.GenerateBookingNumberAsync();
+
+                // Calculate estimated cost
+                var chargingStation = await _mongoDBService.ChargingStations
+                    .Find(cs => cs.Id == createBookingDto.ChargingStationId)
+                    .FirstOrDefaultAsync();
+                
+                decimal? estimatedCost = null;
+                if (chargingStation != null)
+                {
+                    var durationHours = (decimal)(createBookingDto.EndTime - createBookingDto.StartTime).TotalHours;
+                    var estimatedKWh = durationHours * (chargingStation.PowerRatingKW * 0.8m); // Assume 80% efficiency
+                    estimatedCost = estimatedKWh * chargingStation.PricePerKWh;
+                }
+
                 var booking = new Booking
                 {
+                    BookingNumber = bookingNumber,
                     UserId = createBookingDto.UserId,
                     ChargingStationId = createBookingDto.ChargingStationId,
                     BookingDate = createBookingDto.BookingDate,
@@ -57,13 +89,14 @@ namespace WebApplication1.Services
                     EstimatedChargingTimeMinutes = createBookingDto.EstimatedChargingTimeMinutes,
                     Notes = createBookingDto.Notes,
                     Status = BookingStatus.Pending,
+                    TotalCost = estimatedCost,
                     CreatedAt = DateTime.UtcNow
                 };
 
                 await _mongoDBService.Bookings.InsertOneAsync(booking);
 
                 // Send real-time notification
-                var bookingDto = MapToBookingResponseDto(booking);
+                var bookingDto = await MapToBookingResponseDtoAsync(booking);
                 await _notificationService.SendBookingCreatedAsync(bookingDto);
 
                 _logger.LogInformation($"Booking created successfully for user {createBookingDto.UserId}");
@@ -322,11 +355,15 @@ namespace WebApplication1.Services
                     .Limit(searchDto.PageSize)
                     .ToListAsync();
 
+                // Map bookings with related data in parallel
+                var bookingTasks = bookings.Select(MapToBookingResponseDtoAsync);
+                var mappedBookings = await Task.WhenAll(bookingTasks);
+
                 var totalPages = (int)Math.Ceiling((double)totalCount / searchDto.PageSize);
 
                 return new BookingPagedResponseDto
                 {
-                    Bookings = bookings.Select(MapToBookingResponseDto).ToList(),
+                    Bookings = mappedBookings.ToList(),
                     TotalCount = (int)totalCount,
                     Page = searchDto.Page,
                     PageSize = searchDto.PageSize,
@@ -485,6 +522,328 @@ namespace WebApplication1.Services
             }
         }
 
+        /// <summary>
+        /// Cancel a booking with reason
+        /// </summary>
+        public async Task<(bool Success, string Message)> CancelBookingAsync(string bookingId, string cancelledBy, string reason)
+        {
+            try
+            {
+                var existingBooking = await GetBookingByIdAsync(bookingId);
+                if (existingBooking == null)
+                {
+                    return (false, "Booking not found");
+                }
+
+                if (!existingBooking.CanBeCancelled)
+                {
+                    return (false, "Booking cannot be cancelled. It may already be completed or cancelled.");
+                }
+
+                var updateDefinition = Builders<Booking>.Update
+                    .Set(b => b.Status, BookingStatus.Cancelled)
+                    .Set(b => b.CancelledAt, DateTime.UtcNow)
+                    .Set(b => b.CancelledBy, cancelledBy)
+                    .Set(b => b.CancellationReason, reason)
+                    .Set(b => b.ModifiedAt, DateTime.UtcNow);
+
+                var updateResult = await _mongoDBService.Bookings.UpdateOneAsync(
+                    b => b.Id == bookingId,
+                    updateDefinition
+                );
+
+                if (updateResult.ModifiedCount > 0)
+                {
+                    existingBooking.Status = BookingStatus.Cancelled;
+                    existingBooking.CancelledAt = DateTime.UtcNow;
+                    existingBooking.CancelledBy = cancelledBy;
+                    existingBooking.CancellationReason = reason;
+
+                    await _notificationService.SendBookingStatusUpdateAsync(bookingId, existingBooking.Status, BookingStatus.Cancelled, reason);
+
+                    _logger.LogInformation($"Booking {bookingId} cancelled successfully by {cancelledBy}");
+                    return (true, "Booking cancelled successfully");
+                }
+
+                return (false, "Failed to cancel booking");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error cancelling booking {bookingId}");
+                return (false, "An error occurred while cancelling the booking");
+            }
+        }
+
+        /// <summary>
+        /// Approve a booking
+        /// </summary>
+        public async Task<(bool Success, string Message)> ApproveBookingAsync(string bookingId, string approvedBy)
+        {
+            try
+            {
+                var existingBooking = await GetBookingByIdAsync(bookingId);
+                if (existingBooking == null)
+                {
+                    return (false, "Booking not found");
+                }
+
+                if (existingBooking.Status != BookingStatus.Pending)
+                {
+                    return (false, "Only pending bookings can be approved");
+                }
+
+                var updateDefinition = Builders<Booking>.Update
+                    .Set(b => b.Status, BookingStatus.Approved)
+                    .Set(b => b.ApprovedAt, DateTime.UtcNow)
+                    .Set(b => b.ApprovedBy, approvedBy)
+                    .Set(b => b.ModifiedAt, DateTime.UtcNow);
+
+                var updateResult = await _mongoDBService.Bookings.UpdateOneAsync(
+                    b => b.Id == bookingId,
+                    updateDefinition
+                );
+
+                if (updateResult.ModifiedCount > 0)
+                {
+                    await _notificationService.SendBookingStatusUpdateAsync(bookingId, existingBooking.Status, BookingStatus.Approved, $"Booking approved by {approvedBy}");
+
+                    _logger.LogInformation($"Booking {bookingId} approved successfully by {approvedBy}");
+                    return (true, "Booking approved successfully");
+                }
+
+                return (false, "Failed to approve booking");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error approving booking {bookingId}");
+                return (false, "An error occurred while approving the booking");
+            }
+        }
+
+        /// <summary>
+        /// Reject a booking with reason
+        /// </summary>
+        public async Task<(bool Success, string Message)> RejectBookingAsync(string bookingId, string rejectedBy, string reason)
+        {
+            try
+            {
+                var existingBooking = await GetBookingByIdAsync(bookingId);
+                if (existingBooking == null)
+                {
+                    return (false, "Booking not found");
+                }
+
+                if (existingBooking.Status != BookingStatus.Pending)
+                {
+                    return (false, "Only pending bookings can be rejected");
+                }
+
+                var updateDefinition = Builders<Booking>.Update
+                    .Set(b => b.Status, BookingStatus.Rejected)
+                    .Set(b => b.RejectedAt, DateTime.UtcNow)
+                    .Set(b => b.RejectedBy, rejectedBy)
+                    .Set(b => b.RejectionReason, reason)
+                    .Set(b => b.ModifiedAt, DateTime.UtcNow);
+
+                var updateResult = await _mongoDBService.Bookings.UpdateOneAsync(
+                    b => b.Id == bookingId,
+                    updateDefinition
+                );
+
+                if (updateResult.ModifiedCount > 0)
+                {
+                    await _notificationService.SendBookingStatusUpdateAsync(bookingId, existingBooking.Status, BookingStatus.Rejected, reason);
+
+                    _logger.LogInformation($"Booking {bookingId} rejected successfully by {rejectedBy}");
+                    return (true, "Booking rejected successfully");
+                }
+
+                return (false, "Failed to reject booking");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error rejecting booking {bookingId}");
+                return (false, "An error occurred while rejecting the booking");
+            }
+        }
+
+        /// <summary>
+        /// Complete a booking
+        /// </summary>
+        public async Task<(bool Success, string Message)> CompleteBookingAsync(string bookingId, string completedBy, decimal? energyConsumed = null)
+        {
+            try
+            {
+                var existingBooking = await GetBookingByIdAsync(bookingId);
+                if (existingBooking == null)
+                {
+                    return (false, "Booking not found");
+                }
+
+                if (existingBooking.Status != BookingStatus.Approved)
+                {
+                    return (false, "Only approved bookings can be completed");
+                }
+
+                var updateDefinition = Builders<Booking>.Update
+                    .Set(b => b.Status, BookingStatus.Completed)
+                    .Set(b => b.CompletedAt, DateTime.UtcNow)
+                    .Set(b => b.ModifiedAt, DateTime.UtcNow);
+
+                if (energyConsumed.HasValue)
+                {
+                    updateDefinition = updateDefinition.Set(b => b.EnergyConsumedKWh, energyConsumed.Value);
+                    
+                    // Recalculate actual cost based on energy consumed
+                    var chargingStation = await _mongoDBService.ChargingStations.Find(
+                        cs => cs.Id == existingBooking.ChargingStationId
+                    ).FirstOrDefaultAsync();
+
+                    if (chargingStation != null)
+                    {
+                        var actualCost = energyConsumed.Value * chargingStation.PricePerKWh;
+                        updateDefinition = updateDefinition.Set(b => b.TotalCost, actualCost);
+                    }
+                }
+
+                var updateResult = await _mongoDBService.Bookings.UpdateOneAsync(
+                    b => b.Id == bookingId,
+                    updateDefinition
+                );
+
+                if (updateResult.ModifiedCount > 0)
+                {
+                    await _notificationService.SendBookingStatusUpdateAsync(bookingId, existingBooking.Status, BookingStatus.Completed, $"Booking completed by {completedBy}");
+
+                    _logger.LogInformation($"Booking {bookingId} completed successfully by {completedBy}");
+                    return (true, "Booking completed successfully");
+                }
+
+                return (false, "Failed to complete booking");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error completing booking {bookingId}");
+                return (false, "An error occurred while completing the booking");
+            }
+        }
+
+        /// <summary>
+        /// Get booking history for a specific user
+        /// </summary>
+        public async Task<List<BookingResponseDto>> GetUserBookingHistoryAsync(string userId, int limit = 50)
+        {
+            try
+            {
+                var bookings = await _mongoDBService.Bookings.Find(b => b.UserId == userId)
+                    .SortByDescending(b => b.CreatedAt)
+                    .Limit(limit)
+                    .ToListAsync();
+
+                var bookingDtos = new List<BookingResponseDto>();
+                foreach (var booking in bookings)
+                {
+                    var dto = await MapToBookingResponseDtoAsync(booking);
+                    bookingDtos.Add(dto);
+                }
+
+                return bookingDtos;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error getting booking history for user {userId}");
+                return new List<BookingResponseDto>();
+            }
+        }
+
+        /// <summary>
+        /// Get bookings by date range
+        /// </summary>
+        public async Task<List<BookingResponseDto>> GetBookingsByDateRangeAsync(DateTime startDate, DateTime endDate, string? stationId = null)
+        {
+            try
+            {
+                var filterBuilder = Builders<Booking>.Filter;
+                var filter = filterBuilder.And(
+                    filterBuilder.Gte(b => b.BookingDate, startDate.Date),
+                    filterBuilder.Lte(b => b.BookingDate, endDate.Date)
+                );
+
+                if (!string.IsNullOrEmpty(stationId))
+                {
+                    filter = filterBuilder.And(filter, filterBuilder.Eq(b => b.ChargingStationId, stationId));
+                }
+
+                var bookings = await _mongoDBService.Bookings.Find(filter)
+                    .SortByDescending(b => b.CreatedAt)
+                    .ToListAsync();
+
+                var bookingDtos = new List<BookingResponseDto>();
+                foreach (var booking in bookings)
+                {
+                    var dto = await MapToBookingResponseDtoAsync(booking);
+                    bookingDtos.Add(dto);
+                }
+
+                return bookingDtos;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error getting bookings by date range");
+                return new List<BookingResponseDto>();
+            }
+        }
+
+        /// <summary>
+        /// Check for booking conflicts
+        /// </summary>
+        public async Task<bool> HasBookingConflictAsync(string chargingStationId, DateTime startTime, DateTime endTime, string? excludeBookingId = null)
+        {
+            try
+            {
+                var filterBuilder = Builders<Booking>.Filter;
+                var filter = filterBuilder.And(
+                    filterBuilder.Eq(b => b.ChargingStationId, chargingStationId),
+                    filterBuilder.In(b => b.Status, new[] { BookingStatus.Pending, BookingStatus.Approved }),
+                    filterBuilder.Or(
+                        // New booking starts during existing booking
+                        filterBuilder.And(
+                            filterBuilder.Lte(b => b.StartTime, startTime),
+                            filterBuilder.Gt(b => b.EndTime, startTime)
+                        ),
+                        // New booking ends during existing booking
+                        filterBuilder.And(
+                            filterBuilder.Lt(b => b.StartTime, endTime),
+                            filterBuilder.Gte(b => b.EndTime, endTime)
+                        ),
+                        // New booking completely contains existing booking
+                        filterBuilder.And(
+                            filterBuilder.Gte(b => b.StartTime, startTime),
+                            filterBuilder.Lte(b => b.EndTime, endTime)
+                        ),
+                        // Existing booking completely contains new booking
+                        filterBuilder.And(
+                            filterBuilder.Lte(b => b.StartTime, startTime),
+                            filterBuilder.Gte(b => b.EndTime, endTime)
+                        )
+                    )
+                );
+
+                if (!string.IsNullOrEmpty(excludeBookingId))
+                {
+                    filter = filterBuilder.And(filter, filterBuilder.Ne(b => b.Id, excludeBookingId));
+                }
+
+                var conflictingBooking = await _mongoDBService.Bookings.Find(filter).FirstOrDefaultAsync();
+                return conflictingBooking != null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking booking conflicts");
+                return true; // Return true to be safe in case of error
+            }
+        }
+
         #region Private Methods
 
         /// <summary>
@@ -549,13 +908,120 @@ namespace WebApplication1.Services
         }
 
         /// <summary>
-        /// Map Booking entity to BookingResponseDto
+        /// Map Booking entity to BookingResponseDto with related data
+        /// </summary>
+        private async Task<BookingResponseDto> MapToBookingResponseDtoAsync(Booking booking)
+        {
+            var dto = new BookingResponseDto
+            {
+                Id = booking.Id ?? "",
+                BookingNumber = booking.BookingNumber,
+                UserId = booking.UserId,
+                ChargingStationId = booking.ChargingStationId,
+                BookingDate = booking.BookingDate,
+                StartTime = booking.StartTime,
+                EndTime = booking.EndTime,
+                Status = booking.Status,
+                VehicleNumber = booking.VehicleNumber,
+                VehicleType = booking.VehicleType,
+                EstimatedChargingTimeMinutes = booking.EstimatedChargingTimeMinutes,
+                Notes = booking.Notes,
+                QRCode = booking.QRCode,
+                QRCodeGeneratedAt = booking.QRCodeGeneratedAt,
+                CreatedAt = booking.CreatedAt,
+                ModifiedAt = booking.ModifiedAt,
+                ApprovedAt = booking.ApprovedAt,
+                ApprovedBy = booking.ApprovedBy,
+                CompletedAt = booking.CompletedAt,
+                CancelledAt = booking.CancelledAt,
+                CancelledBy = booking.CancelledBy,
+                CancellationReason = booking.CancellationReason,
+                RejectedAt = booking.RejectedAt,
+                RejectedBy = booking.RejectedBy,
+                RejectionReason = booking.RejectionReason,
+                ActualStartTime = booking.ActualStartTime,
+                ActualEndTime = booking.ActualEndTime,
+                TotalCost = booking.TotalCost,
+                EnergyConsumedKWh = booking.EnergyConsumedKWh,
+                DurationMinutes = booking.DurationMinutes
+            };
+
+            // Load user information
+            try
+            {
+                var user = await _mongoDBService.EVOwners
+                    .Find(u => u.Id == booking.UserId)
+                    .FirstOrDefaultAsync();
+
+                if (user != null)
+                {
+                    dto.User = new UserResponseDto
+                    {
+                        Id = user.Id ?? "",
+                        NIC = user.NIC,
+                        FullName = user.FullName,
+                        Email = user.Email,
+                        PhoneNumber = user.PhoneNumber,
+                        Address = user.Address,
+                        IsActive = user.IsActive,
+                        IsApproved = user.IsApproved
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to load user for booking {BookingId}", booking.Id);
+            }
+
+            // Load charging station information
+            try
+            {
+                var station = await _mongoDBService.ChargingStations
+                    .Find(cs => cs.Id == booking.ChargingStationId)
+                    .FirstOrDefaultAsync();
+
+                if (station != null)
+                {
+                    dto.ChargingStation = new ChargingStationResponseDto
+                    {
+                        Id = station.Id ?? "",
+                        StationName = station.StationName,
+                        Location = station.Location,
+                        Address = station.Address,
+                        ConnectorType = station.ConnectorType.ToString(),
+                        PowerRatingKW = station.PowerRatingKW,
+                        PricePerKWh = station.PricePerKWh,
+                        Status = station.Status.ToString(),
+                        Description = station.Description,
+                        Amenities = station.Amenities,
+                        OperatingHours = station.OperatingHours,
+                        IsAvailable = station.IsAvailable,
+                        MaxBookingDurationMinutes = station.MaxBookingDurationMinutes,
+                        Coordinates = new CoordinatesDto
+                        {
+                            Latitude = station.Latitude ?? 0,
+                            Longitude = station.Longitude ?? 0
+                        }
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to load charging station for booking {BookingId}", booking.Id);
+            }
+
+            return dto;
+        }
+
+        /// <summary>
+        /// Legacy method - kept for compatibility but should use async version
         /// </summary>
         private BookingResponseDto MapToBookingResponseDto(Booking booking)
         {
             return new BookingResponseDto
             {
                 Id = booking.Id ?? "",
+                BookingNumber = booking.BookingNumber,
                 UserId = booking.UserId,
                 ChargingStationId = booking.ChargingStationId,
                 BookingDate = booking.BookingDate,

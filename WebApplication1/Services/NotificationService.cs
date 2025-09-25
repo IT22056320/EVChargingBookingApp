@@ -80,6 +80,10 @@ namespace WebApplication1.Services
                     Type = "BookingCreated"
                 };
 
+                // Send to all connected users
+                await _hubContext.Clients.All
+                    .SendAsync("BookingCreated", notification);
+
                 // Send to station operators and backoffice
                 await _hubContext.Clients.Groups("StationOperator", "Backoffice")
                     .SendAsync("BookingCreated", notification);

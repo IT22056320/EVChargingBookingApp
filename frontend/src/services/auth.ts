@@ -31,6 +31,10 @@ export class AuthService {
         }
 
         console.log('AuthService: Transformed user:', transformedUser)
+        
+        // Save user data and create a simple auth token (user session indicator)
+        this.saveAuthData(transformedUser, 'authenticated')
+        
         return {
           success: true,
           message: response.message,
@@ -70,7 +74,10 @@ export class AuthService {
   }
 
   isAuthenticated(): boolean {
-    return !!localStorage.getItem('authToken')
+    // Check if both user data and auth token exist
+    const userData = localStorage.getItem('user')
+    const authToken = localStorage.getItem('authToken')
+    return !!(userData && authToken)
   }
 
   saveAuthData(user: User, token?: string): void {

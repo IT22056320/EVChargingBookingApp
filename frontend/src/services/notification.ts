@@ -1,5 +1,6 @@
 import { HubConnectionBuilder, HubConnection, LogLevel } from '@microsoft/signalr'
 import { UserRole } from '@/types'
+import toast from 'react-hot-toast'
 
 export interface Notification {
   id: string
@@ -25,18 +26,34 @@ export class NotificationService {
 
       this.connection = new HubConnectionBuilder()
         .withUrl('http://localhost:5001/bookingNotificationHub', {
-          withCredentials: true
+          withCredentials: true,
+          skipNegotiation: true,
+          transport: 1 // WebSockets
         })
         .configureLogging(LogLevel.Information)
         .build()
 
       // Set up event handlers
       this.connection.on('ReceiveNotification', (notification: Notification) => {
-        console.log('Received notification:', notification)
-        
-        // Check if notification is for this user's role
         if (this.shouldReceiveNotification(notification, userRole, userId)) {
           this.addNotification(notification)
+        }
+      })
+
+      this.connection.on('BookingCreated', (notification: any) => {
+        const bookingNotification: Notification = {
+          id: `booking-created-${notification.Booking?.id || Date.now()}-${Date.now()}`,
+          title: 'New Booking Created',
+          message: `${notification.Message || 'New booking created'} by ${notification.Booking?.User?.fullName || 'Unknown User'}`,
+          type: 'info',
+          timestamp: new Date().toISOString(),
+          isRead: false,
+          targetRoles: [UserRole.Backoffice, UserRole.StationOperator],
+          userId: undefined
+        }
+        
+        if (this.shouldReceiveNotification(bookingNotification, userRole, userId)) {
+          this.addNotification(bookingNotification)
         }
       })
 
@@ -74,12 +91,19 @@ export class NotificationService {
         }
       })
 
-      this.connection.onclose(() => {
-        console.log('SignalR connection closed')
+      this.connection.onclose((error) => {
+        console.log('SignalR connection closed', error)
+      })
+
+      this.connection.onreconnecting((error) => {
+        console.log('SignalR reconnecting...', error)
+      })
+
+      this.connection.onreconnected((connectionId) => {
+        console.log('SignalR reconnected with ID:', connectionId)
       })
 
       await this.connection.start()
-      console.log('SignalR connected successfully')
 
       // Send welcome notification based on role
       this.addWelcomeNotification(userRole)
@@ -119,7 +143,60 @@ export class NotificationService {
       this.notifications = this.notifications.slice(0, 50)
     }
 
+    // Show hot toast for important notifications
+    this.showToast(notification)
+
     this.notifyListeners()
+  }
+
+  private showToast(notification: Notification): void {
+    const message = `${notification.title}: ${notification.message}`
+    
+    switch (notification.type) {
+      case 'success':
+        toast.success(message, {
+          duration: 4000,
+          icon: '✅'
+        })
+        break
+      case 'error':
+        toast.error(message, {
+          duration: 6000,
+          icon: '❌'
+        })
+        break
+      case 'warning':
+        toast(message, {
+          duration: 5000,
+          icon: '⚠️',
+          style: {
+            border: '1px solid #F59E0B',
+            background: '#FFFBEB',
+            color: '#92400E',
+          },
+        })
+        break
+      case 'info':
+      default:
+        // Show booking-related notifications with special styling
+        if (notification.title.toLowerCase().includes('booking')) {
+          toast(message, {
+            duration: 5000,
+            icon: '🚗',
+            style: {
+              border: '1px solid #3B82F6',
+              background: '#EFF6FF',
+              color: '#1E40AF',
+            },
+          })
+        } else {
+          toast(message, {
+            duration: 4000,
+            icon: 'ℹ️'
+          })
+        }
+        break
+    }
   }
 
   private addWelcomeNotification(userRole: UserRole): void {
