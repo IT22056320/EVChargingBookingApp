@@ -46,7 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (response.success && response.user) {
         console.log('AuthProvider: Setting user state:', response.user)
         setUser(response.user)
-        authService.saveAuthData(response.user)
+        // Note: saveAuthData is now called within authService.login()
         console.log('AuthProvider: User state updated, isAuthenticated will be:', !!response.user)
       } else {
         console.error('AuthProvider: Login failed:', response.message)

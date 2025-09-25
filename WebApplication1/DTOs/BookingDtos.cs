@@ -117,6 +117,7 @@ namespace WebApplication1.DTOs
     public class BookingResponseDto
     {
         public string Id { get; set; } = string.Empty;
+        public string BookingNumber { get; set; } = string.Empty;
         public string UserId { get; set; } = string.Empty;
         public string ChargingStationId { get; set; } = string.Empty;
         public DateTime BookingDate { get; set; }
@@ -167,6 +168,9 @@ namespace WebApplication1.DTOs
         public string FullName { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
         public string PhoneNumber { get; set; } = string.Empty;
+        public string Address { get; set; } = string.Empty;
+        public bool IsActive { get; set; }
+        public bool IsApproved { get; set; }
     }
 
     /// <summary>
@@ -178,10 +182,25 @@ namespace WebApplication1.DTOs
         public string StationName { get; set; } = string.Empty;
         public string Location { get; set; } = string.Empty;
         public string Address { get; set; } = string.Empty;
-        public ConnectorType ConnectorType { get; set; }
+        public string ConnectorType { get; set; } = string.Empty;
         public decimal PowerRatingKW { get; set; }
         public decimal PricePerKWh { get; set; }
-        public ChargingStationStatus Status { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public List<string> Amenities { get; set; } = new List<string>();
+        public string OperatingHours { get; set; } = string.Empty;
+        public bool IsAvailable { get; set; }
+        public int MaxBookingDurationMinutes { get; set; }
+        public CoordinatesDto? Coordinates { get; set; }
+    }
+
+    /// <summary>
+    /// Coordinates DTO
+    /// </summary>
+    public class CoordinatesDto
+    {
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
     }
 
     /// <summary>

@@ -12,6 +12,7 @@ builder.Services.AddSwaggerGen();
 // Register MongoDB and custom services
 builder.Services.AddSingleton<MongoDBService>();
 builder.Services.AddScoped<BookingService>();
+builder.Services.AddScoped<BookingNumberService>();
 builder.Services.AddScoped<QRCodeService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 

@@ -15,6 +15,7 @@ export interface CreateBooking {
 
 export interface BookingResponse {
   id: string
+  bookingNumber: string
   userId: string
   chargingStationId: string
   bookingDate: string
@@ -57,6 +58,9 @@ export interface UserResponse {
   fullName: string
   email: string
   phoneNumber: string
+  address: string
+  isActive: boolean
+  isApproved: boolean
 }
 
 export interface ChargingStationResponse {
@@ -68,6 +72,15 @@ export interface ChargingStationResponse {
   powerRatingKW: number
   pricePerKWh: number
   status: ChargingStationStatus
+  description: string
+  amenities: string[]
+  operatingHours: string
+  isAvailable: boolean
+  maxBookingDurationMinutes: number
+  coordinates?: {
+    latitude: number
+    longitude: number
+  }
 }
 
 export enum BookingStatus {
@@ -263,49 +276,7 @@ class BookingApiService {
 
   // Get all charging stations (for booking creation)
   async getChargingStations(): Promise<ChargingStation[]> {
-    // This would typically come from a separate ChargingStationsController
-    // For now, return mock data that matches the backend structure
-    return [
-      {
-        id: '1',
-        stationName: 'Downtown Charging Hub',
-        location: 'Colombo 03',
-        address: '123 Main Street, Colombo 03',
-        connectorType: ConnectorType.CCS,
-        powerRatingKW: 50,
-        pricePerKWh: 25.0,
-        status: ChargingStationStatus.Available,
-        coordinates: { latitude: 6.9271, longitude: 79.8612 },
-        amenities: ['WiFi', 'Restroom', 'Café'],
-        description: 'Fast charging station in the heart of Colombo'
-      },
-      {
-        id: '2',
-        stationName: 'Mall Parking Station',
-        location: 'Nugegoda',
-        address: '456 High Level Road, Nugegoda',
-        connectorType: ConnectorType.TypeA,
-        powerRatingKW: 22,
-        pricePerKWh: 20.0,
-        status: ChargingStationStatus.Available,
-        coordinates: { latitude: 6.8649, longitude: 79.8997 },
-        amenities: ['Shopping Mall', 'Food Court', 'Parking'],
-        description: 'Convenient charging while you shop'
-      },
-      {
-        id: '3',
-        stationName: 'Airport Express Station',
-        location: 'Katunayake',
-        address: 'Bandaranaike International Airport, Katunayake',
-        connectorType: ConnectorType.CHAdeMO,
-        powerRatingKW: 100,
-        pricePerKWh: 30.0,
-        status: ChargingStationStatus.Available,
-        coordinates: { latitude: 7.1804, longitude: 79.8841 },
-        amenities: ['Airport Access', 'Duty Free', '24/7'],
-        description: 'Ultra-fast charging for travelers'
-      }
-    ]
+    return await apiService.get('/ChargingStations')
   }
 
   // Get status display name

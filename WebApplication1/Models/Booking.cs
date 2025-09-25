@@ -34,6 +34,10 @@ namespace WebApplication1.Models
         [BsonRepresentation(BsonType.ObjectId)]
         public string? Id { get; set; }
 
+        [BsonElement("bookingNumber")]
+        [Required]
+        public string BookingNumber { get; set; } = string.Empty;
+
         [BsonElement("userId")]
         [BsonRepresentation(BsonType.ObjectId)]
         [Required]
