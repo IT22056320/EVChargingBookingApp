@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../providers/auth-provider'
 import { dashboardApi, DashboardStatistics, ActivityLog } from '../services/dashboardApi'
+import { UserRole } from '../types'
 import toast from '../utils/toast'
 import { Users, UserCheck, Clock, Car, Shield, Activity, Zap, ArrowUpRight, ArrowRight } from 'lucide-react'
 
@@ -63,7 +64,7 @@ export function DashboardPage() {
     window.location.href = '/ev-owners'
   }
 
-  const isBackoffice = user?.role === 'Backoffice'
+  const isBackoffice = user?.role === UserRole.Backoffice
 
   if (isLoading) {
     return (

@@ -4,6 +4,7 @@ import { NotificationProvider } from '@/providers/notification-provider'
 import { LoginPage } from '@/pages/auth/login'
 import { DashboardPage } from '@/pages/dashboard'
 import { BookingsPage } from '@/pages/bookings'
+import { CreateBookingPage } from '@/pages/create-booking'
 import { EVOwnersPage } from '@/pages/ev-owners'
 import { ProtectedRoute } from '@/components/auth/protected-route'
 import { Layout } from '@/components/layout/layout'
@@ -25,6 +26,7 @@ function App() {
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/dashboard" element={<DashboardPage />} />
                     <Route path="/bookings" element={<BookingsPage />} />
+                    <Route path="/create-booking" element={<CreateBookingPage />} />
                     <Route path="/ev-owners" element={<EVOwnersPage />} />
                   </Routes>
                 </Layout>

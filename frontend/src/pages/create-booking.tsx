@@ -487,7 +487,7 @@ export function CreateBookingPage() {
             maxLength={500}
             className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
           />
-          <p className="text-xs text-muted-foreground mt-1">{formData.notes.length}/500 characters</p>
+          <p className="text-xs text-muted-foreground mt-1">{(formData.notes || '').length}/500 characters</p>
         </div>
 
         {/* Submit Button */}

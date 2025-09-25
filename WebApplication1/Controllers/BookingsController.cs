@@ -636,10 +636,10 @@ namespace WebApplication1.Controllers
                         StationName = station.StationName,
                         Location = station.Location,
                         Address = station.Address,
-                        ConnectorType = station.ConnectorType,
+                        ConnectorType = station.ConnectorType.ToString(),
                         PowerRatingKW = station.PowerRatingKW,
                         PricePerKWh = station.PricePerKWh,
-                        Status = station.Status
+                        Status = station.Status.ToString()
                     };
                 }
             }
@@ -649,6 +649,82 @@ namespace WebApplication1.Controllers
             }
 
             return response;
+        }
+
+        /// <summary>
+        /// Get booking history for a user
+        /// </summary>
+        /// <param name="userId">User ID</param>
+        /// <param name="limit">Maximum number of bookings to return</param>
+        /// <returns>User's booking history</returns>
+        [HttpGet("history/{userId}")]
+        [ProducesResponseType(typeof(List<BookingResponseDto>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetUserBookingHistory(string userId, [FromQuery] int limit = 50)
+        {
+            try
+            {
+                var bookings = await _bookingService.GetUserBookingHistoryAsync(userId, limit);
+                return Ok(bookings);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error retrieving booking history for user {userId}");
+                return StatusCode(500, "An error occurred while retrieving booking history");
+            }
+        }
+
+        /// <summary>
+        /// Get bookings by date range
+        /// </summary>
+        /// <param name="startDate">Start date</param>
+        /// <param name="endDate">End date</param>
+        /// <param name="stationId">Optional station ID filter</param>
+        /// <returns>Bookings in date range</returns>
+        [HttpGet("date-range")]
+        [ProducesResponseType(typeof(List<BookingResponseDto>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetBookingsByDateRange(
+            [FromQuery] DateTime startDate, 
+            [FromQuery] DateTime endDate, 
+            [FromQuery] string? stationId = null)
+        {
+            try
+            {
+                var bookings = await _bookingService.GetBookingsByDateRangeAsync(startDate, endDate, stationId);
+                return Ok(bookings);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving bookings by date range");
+                return StatusCode(500, "An error occurred while retrieving bookings");
+            }
+        }
+
+        /// <summary>
+        /// Check for booking conflicts
+        /// </summary>
+        /// <param name="stationId">Charging station ID</param>
+        /// <param name="startTime">Proposed start time</param>
+        /// <param name="endTime">Proposed end time</param>
+        /// <param name="excludeBookingId">Booking ID to exclude from conflict check</param>
+        /// <returns>True if there are conflicts</returns>
+        [HttpGet("check-conflict")]
+        [ProducesResponseType(typeof(bool), StatusCodes.Status200OK)]
+        public async Task<IActionResult> CheckBookingConflict(
+            [FromQuery] string stationId,
+            [FromQuery] DateTime startTime,
+            [FromQuery] DateTime endTime,
+            [FromQuery] string? excludeBookingId = null)
+        {
+            try
+            {
+                var hasConflict = await _bookingService.HasBookingConflictAsync(stationId, startTime, endTime, excludeBookingId);
+                return Ok(hasConflict);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking booking conflicts");
+                return StatusCode(500, "An error occurred while checking booking conflicts");
+            }
         }
 
         #endregion

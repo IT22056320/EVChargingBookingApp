@@ -76,6 +76,7 @@ export enum VehicleType {
 
 export interface Booking {
   id: string
+  bookingNumber: string
   userId: string
   chargingStationId: string
   bookingDate: string
@@ -118,6 +119,9 @@ export interface UserResponseDto {
   fullName: string
   email: string
   phoneNumber?: string
+  address?: string
+  isActive: boolean
+  isApproved: boolean
 }
 
 export interface ChargingStationResponseDto {
@@ -129,6 +133,15 @@ export interface ChargingStationResponseDto {
   powerRatingKW: number
   pricePerKWh: number
   status: string
+  description: string
+  amenities: string[]
+  operatingHours: string
+  isAvailable: boolean
+  maxBookingDurationMinutes: number
+  coordinates?: {
+    latitude: number
+    longitude: number
+  }
 }
 
 export interface CreateBookingDto {
