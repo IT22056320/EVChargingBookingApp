@@ -1,4 +1,11 @@
-﻿using MongoDB.Driver;
+﻿/*
+ * File: ChargingStationService.cs
+ * Description: Service for Charging Station business logic and database operations
+ * Author: EV Charging Team
+ * Date: September 30, 2025
+ */
+
+using MongoDB.Driver;
 using WebApplication1.Models;
 using WebApplication1.DTOs;
 
@@ -9,18 +16,21 @@ namespace WebApplication1.Services
         private readonly MongoDBService _mongoDBService;
         private readonly ILogger<ChargingStationService> _logger;
 
+        // Constructor for ChargingStationService
         public ChargingStationService(MongoDBService mongoDBService, ILogger<ChargingStationService> logger)
         {
             _mongoDBService = mongoDBService;
             _logger = logger;
         }
 
+        // Retrieves all charging stations from the database
         public async Task<List<ChargingStationDto>> GetAllAsync()
         {
             var stations = await _mongoDBService.ChargingStations.Find(_ => true).ToListAsync();
             return stations.Select(MapToDto).ToList();
         }
 
+        // Retrieves a charging station by its ID
         public async Task<ChargingStationDto?> GetByIdAsync(string id)
         {
             var station = await _mongoDBService.ChargingStations
@@ -30,6 +40,7 @@ namespace WebApplication1.Services
             return station == null ? null : MapToDto(station);
         }
 
+        // Creates a new charging station in the database
         public async Task<(bool Success, string Message, ChargingStationDto? Station)> CreateAsync(ChargingStationDto dto)
         {
             try
@@ -47,6 +58,7 @@ namespace WebApplication1.Services
             }
         }
 
+        // Updates an existing charging station
         public async Task<(bool Success, string Message)> UpdateAsync(string id, ChargingStationDto dto)
         {
             try
@@ -77,6 +89,7 @@ namespace WebApplication1.Services
             }
         }
 
+        // Soft deletes (deactivates) a charging station
         public async Task<(bool Success, string Message)> DeleteAsync(string id)
         {
             try
@@ -104,6 +117,7 @@ namespace WebApplication1.Services
 
         #region Private Mapping Methods
 
+        // Maps ChargingStation model to ChargingStationDto
         private ChargingStationDto MapToDto(ChargingStation station)
         {
             return new ChargingStationDto
@@ -123,16 +137,17 @@ namespace WebApplication1.Services
                 Amenities = station.Amenities,
                 OperatingHours = station.OperatingHours,
                 IsAvailable = station.IsAvailable,
-                TotalSlots = station.TotalSlots, // Correct mapping
+                TotalSlots = station.TotalSlots, 
                 MaxBookingDurationMinutes = station.MaxBookingDurationMinutes,
                 AvailableSlots = station.AvailableSlots,
                 CreatedAt = station.CreatedAt,
                 UpdatedAt = station.UpdatedAt,
                 LastMaintenanceDate = station.LastMaintenanceDate,
-                NextMaintenanceDate = station.NextMaintenanceDate // Correct mapping
+                NextMaintenanceDate = station.NextMaintenanceDate
             };
         }
 
+        // Maps ChargingStationDto to ChargingStation model
         private ChargingStation MapToModel(ChargingStationDto dto)
         {
             return new ChargingStation

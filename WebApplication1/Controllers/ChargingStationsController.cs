@@ -1,8 +1,8 @@
 /*
  * File: ChargingStationsController.cs
  * Description: API Controller for Charging Stations management
- * Author: [Your Team Name]
- * Date: [Current Date]
+ * Author: EV Charging Team
+ * Date: September 30, 2025
  */
 
 using Microsoft.AspNetCore.Mvc;
@@ -20,6 +20,7 @@ namespace WebApplication1.Controllers
         private readonly ChargingStationService _stationService;
         private readonly BookingService _bookingService;
 
+        // Constructor for ChargingStationsController
         public ChargingStationsController(
             ChargingStationService stationService,
             BookingService bookingService)
@@ -28,6 +29,7 @@ namespace WebApplication1.Controllers
             _bookingService = bookingService;
         }
 
+        // Gets all charging stations
         [HttpGet]
         public async Task<IActionResult> GetStations()
         {
@@ -35,6 +37,7 @@ namespace WebApplication1.Controllers
             return Ok(stations);
         }
 
+        // Gets a charging station by ID
         [HttpGet("{id}")]
         public async Task<IActionResult> GetStation(string id)
         {
@@ -43,6 +46,7 @@ namespace WebApplication1.Controllers
             return Ok(station);
         }
 
+        // Creates a new charging station
         [HttpPost]
         public async Task<IActionResult> CreateStation([FromBody] ChargingStationDto dto)
         {
@@ -51,6 +55,7 @@ namespace WebApplication1.Controllers
             return CreatedAtAction(nameof(GetStation), new { id = result.Station!.Id }, result.Station);
         }
 
+        // Updates a charging station
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateStation(string id, [FromBody] ChargingStationDto dto)
         {
@@ -69,6 +74,7 @@ namespace WebApplication1.Controllers
             return Ok(new { message = result.Message });
         }
 
+        // Deletes (deactivates) a charging station
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteStation(string id)
         {

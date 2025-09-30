@@ -1,3 +1,10 @@
+/*
+ * File: ChargingStationDto.cs
+ * Description: Data Transfer Object for Charging Station operations
+ * Author: EV Charging Team
+ * Date: September 30, 2025
+ */
+
 using System;
 using System.Collections.Generic;
 
@@ -5,6 +12,7 @@ namespace WebApplication1.DTOs
 {
     public class ChargingStationDto
     {
+        // Properties for ChargingStationDto
         public string? Id { get; set; }
         public string StationName { get; set; } = string.Empty;
         public string Location { get; set; } = string.Empty;
@@ -28,9 +36,10 @@ namespace WebApplication1.DTOs
         public DateTime? LastMaintenanceDate { get; set; }
         public DateTime? NextMaintenanceDate { get; set; }
 
-        // Ensure AvailableSlots equals TotalSlots by default
+        // Constructor for ChargingStationDto
         public ChargingStationDto()
         {
+            // Ensure AvailableSlots equals TotalSlots by default
             AvailableSlots = TotalSlots;
         }
     }

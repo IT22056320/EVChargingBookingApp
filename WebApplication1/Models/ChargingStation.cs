@@ -1,8 +1,8 @@
 /*
  * File: ChargingStation.cs
  * Description: Model for EV Charging Stations
- * Author: [Your Team Name]
- * Date: [Current Date]
+ * Author: EV Charging Team
+ * Date: September 30, 2025
  */
 
 using MongoDB.Bson;
@@ -125,14 +125,14 @@ namespace WebApplication1.Models
         public List<Booking>? Bookings { get; set; }
 
         /// <summary>
-        /// Check if station is currently available for booking
+        /// Checks if the station is currently available for booking.
         /// </summary>
         [BsonIgnore]
         public bool IsBookingAvailable => 
             Status == ChargingStationStatus.Active && IsAvailable;
 
         /// <summary>
-        /// Check if station requires maintenance
+        /// Checks if the station requires maintenance.
         /// </summary>
         [BsonIgnore]
         public bool RequiresMaintenance => 
