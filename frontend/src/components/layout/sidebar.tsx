@@ -8,6 +8,7 @@ export function Sidebar() {
     { name: 'Dashboard', href: '/dashboard', current: location.pathname === '/dashboard' },
     { name: 'Bookings', href: '/bookings', current: location.pathname === '/bookings' },
     { name: 'EV Owners', href: '/ev-owners', current: location.pathname === '/ev-owners' },
+    { name: "Charging Stations", href: "/stations", current: location.pathname === "/stations" },
   ]
 
   return (

@@ -12,7 +12,7 @@ import type {
 export class AuthService {
   async login(credentials: LoginRequest): Promise<LoginResponse> {
     console.log('AuthService: Attempting login with:', credentials.email)
-    console.log('API Base URL:', import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api')
+    console.log('API Base URL:', import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api')
     
     try {
       const response = await apiService.post<any>('/webusers/login', credentials)
