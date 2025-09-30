@@ -27,11 +27,12 @@ namespace WebApplication1.Models
     /// </summary>
     public enum ConnectorType
     {
-        Type1 = 0,
-        Type2 = 1,
-        CHAdeMO = 2,
-        CCS = 3,
-        Tesla = 4
+        Unknown = 0,
+        Type1 = 1,
+        Type2 = 2,
+        CHAdeMO = 3,
+        CCS = 4,
+        Tesla = 5
     }
 
     /// <summary>
@@ -93,6 +94,13 @@ namespace WebApplication1.Models
 
         [BsonElement("maxBookingDurationMinutes")]
         public int MaxBookingDurationMinutes { get; set; } = 240; // 4 hours default
+
+        [BsonElement("availableSlots")]
+        [Required]
+        public int AvailableSlots { get; set; } = 0;
+
+        [BsonElement("totalSlots")]
+        public int TotalSlots { get; set; } = 0;
 
         [BsonElement("createdAt")]
         [BsonDateTimeOptions(Kind = DateTimeKind.Utc)]

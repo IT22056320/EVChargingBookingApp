@@ -844,6 +844,19 @@ namespace WebApplication1.Services
             }
         }
 
+        /// <summary>
+        /// Check if there are active bookings for the charging station
+        /// </summary>
+        public async Task<bool> HasActiveBookingsAsync(string chargingStationId)
+        {
+            // Query for bookings at this station with status ACTIVE or CONFIRMED
+            var filter = Builders<Booking>.Filter.Eq(b => b.ChargingStationId, chargingStationId) &
+                         Builders<Booking>.Filter.In(b => b.Status, new[] { BookingStatus.Pending, BookingStatus.Approved });
+
+            var count = await _mongoDBService.Bookings.CountDocumentsAsync(filter);
+            return count > 0;
+        }
+
         #region Private Methods
 
         /// <summary>

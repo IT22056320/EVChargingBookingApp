@@ -15,6 +15,7 @@ builder.Services.AddScoped<BookingService>();
 builder.Services.AddScoped<BookingNumberService>();
 builder.Services.AddScoped<QRCodeService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<ChargingStationService>();
 
 // Add SignalR
 builder.Services.AddSignalR();

@@ -17,105 +17,65 @@ namespace WebApplication1.Controllers
     [Route("api/[controller]")]
     public class ChargingStationsController : ControllerBase
     {
-        private readonly MongoDBService _mongoDBService;
-        private readonly ILogger<ChargingStationsController> _logger;
+        private readonly ChargingStationService _stationService;
+        private readonly BookingService _bookingService;
 
-        public ChargingStationsController(MongoDBService mongoDBService, ILogger<ChargingStationsController> logger)
+        public ChargingStationsController(
+            ChargingStationService stationService,
+            BookingService bookingService)
         {
-            _mongoDBService = mongoDBService;
-            _logger = logger;
+            _stationService = stationService;
+            _bookingService = bookingService;
         }
 
-        /// <summary>
-        /// Get all active charging stations
-        /// </summary>
         [HttpGet]
-        public async Task<IActionResult> GetChargingStations()
+        public async Task<IActionResult> GetStations()
         {
-            try
-            {
-                var filter = Builders<ChargingStation>.Filter.Eq(cs => cs.Status, ChargingStationStatus.Active);
-                var chargingStations = await _mongoDBService.ChargingStations
-                    .Find(filter)
-                    .ToListAsync();
-
-                var response = chargingStations.Select(cs => new ChargingStationResponseDto
-                {
-                    Id = cs.Id ?? string.Empty,
-                    StationName = cs.StationName,
-                    Location = cs.Location,
-                    Address = cs.Address,
-                    ConnectorType = cs.ConnectorType.ToString(),
-                    PowerRatingKW = cs.PowerRatingKW,
-                    PricePerKWh = cs.PricePerKWh,
-                    Status = cs.Status.ToString(),
-                    Description = cs.Description,
-                    Amenities = cs.Amenities,
-                    OperatingHours = cs.OperatingHours,
-                    IsAvailable = cs.IsAvailable,
-                    MaxBookingDurationMinutes = cs.MaxBookingDurationMinutes,
-                    Coordinates = new CoordinatesDto
-                    {
-                        Latitude = cs.Latitude ?? 0,
-                        Longitude = cs.Longitude ?? 0
-                    }
-                }).ToList();
-
-                return Ok(response);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving charging stations");
-                return StatusCode(500, new { message = "An error occurred while retrieving charging stations." });
-            }
+            var stations = await _stationService.GetAllAsync();
+            return Ok(stations);
         }
 
-        /// <summary>
-        /// Get charging station by ID
-        /// </summary>
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetChargingStation(string id)
+        public async Task<IActionResult> GetStation(string id)
         {
-            try
-            {
-                var chargingStation = await _mongoDBService.ChargingStations
-                    .Find(cs => cs.Id == id)
-                    .FirstOrDefaultAsync();
+            var station = await _stationService.GetByIdAsync(id);
+            if (station == null) return NotFound();
+            return Ok(station);
+        }
 
-                if (chargingStation == null)
+        [HttpPost]
+        public async Task<IActionResult> CreateStation([FromBody] ChargingStationDto dto)
+        {
+            var result = await _stationService.CreateAsync(dto);
+            if (!result.Success) return BadRequest(result.Message);
+            return CreatedAtAction(nameof(GetStation), new { id = result.Station!.Id }, result.Station);
+        }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateStation(string id, [FromBody] ChargingStationDto dto)
+        {
+            // Check if the update is a deactivation
+            if (dto.IsAvailable == false)
+            {
+                // Query for active bookings at this station
+                var hasActiveBookings = await _bookingService.HasActiveBookingsAsync(id);
+                if (hasActiveBookings)
                 {
-                    return NotFound(new { message = "Charging station not found." });
+                    return BadRequest("Cannot deactivate station: active bookings exist.");
                 }
-
-                var response = new ChargingStationResponseDto
-                {
-                    Id = chargingStation.Id ?? string.Empty,
-                    StationName = chargingStation.StationName,
-                    Location = chargingStation.Location,
-                    Address = chargingStation.Address,
-                    ConnectorType = chargingStation.ConnectorType.ToString(),
-                    PowerRatingKW = chargingStation.PowerRatingKW,
-                    PricePerKWh = chargingStation.PricePerKWh,
-                    Status = chargingStation.Status.ToString(),
-                    Description = chargingStation.Description,
-                    Amenities = chargingStation.Amenities,
-                    OperatingHours = chargingStation.OperatingHours,
-                    IsAvailable = chargingStation.IsAvailable,
-                    MaxBookingDurationMinutes = chargingStation.MaxBookingDurationMinutes,
-                    Coordinates = new CoordinatesDto
-                    {
-                        Latitude = chargingStation.Latitude ?? 0,
-                        Longitude = chargingStation.Longitude ?? 0
-                    }
-                };
-
-                return Ok(response);
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving charging station with ID: {ChargingStationId}", id);
-                return StatusCode(500, new { message = "An error occurred while retrieving the charging station." });
-            }
+            var result = await _stationService.UpdateAsync(id, dto);
+            if (!result.Success) return BadRequest(result.Message);
+            return Ok(new { message = result.Message });
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteStation(string id)
+        {
+            var result = await _stationService.DeleteAsync(id);
+            if (!result.Success) return BadRequest(result.Message);
+            return Ok(new { message = result.Message });
         }
     }
+
 }
