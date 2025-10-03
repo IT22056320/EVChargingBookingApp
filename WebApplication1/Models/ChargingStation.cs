@@ -80,10 +80,6 @@ namespace WebApplication1.Models
         [BsonElement("operatorId")]
         public string OperatorId { get; set; } = string.Empty;
 
-
-        [BsonElement("amenities")]
-        public List<string> Amenities { get; set; } = new List<string>();
-
         [BsonElement("operatingHours")]
         public string OperatingHours { get; set; } = "24/7";
 
