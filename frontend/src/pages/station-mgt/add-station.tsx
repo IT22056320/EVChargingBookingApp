@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import Swal from 'sweetalert2'
-import { 
-  MapPin, 
-  Plus, 
+import {
+  MapPin,
+  Plus,
   ArrowLeft,
   Zap,
   Navigation,
@@ -28,7 +28,6 @@ type StationForm = {
   powerRatingKW: number;
   pricePerKWh: string;
   totalSlots: string;
-  amenities: string;
   operatingHours: string;
   contactNumber: string;
 };
@@ -44,7 +43,6 @@ export default function AddStationPage() {
     powerRatingKW: 0,
     pricePerKWh: '',
     totalSlots: '',
-    amenities: '',
     operatingHours: '24/7',
     contactNumber: '',
   })
@@ -73,7 +71,7 @@ export default function AddStationPage() {
   useEffect(() => {
     if (mapLoaded && mapRef.current && window.google) {
       const defaultCenter = { lat: 6.9271, lng: 79.8612 }
-      const center = form.latitude && form.longitude 
+      const center = form.latitude && form.longitude
         ? { lat: parseFloat(form.latitude), lng: parseFloat(form.longitude) }
         : defaultCenter
 
@@ -119,7 +117,7 @@ export default function AddStationPage() {
     if (googleMapRef.current && form.latitude && form.longitude) {
       const lat = parseFloat(form.latitude)
       const lng = parseFloat(form.longitude)
-      
+
       if (markerRef.current) {
         markerRef.current.setMap(null)
       }
@@ -152,7 +150,8 @@ export default function AddStationPage() {
         longitude: parseFloat(form.longitude),
         connectorType: form.connectorType,
         powerRatingKW: form.powerRatingKW,
-        totalSlots: parseInt(form.totalSlots)
+        totalSlots: parseInt(form.totalSlots),
+        pricePerKWh: parseFloat(form.pricePerKWh)
       }
       // Dynamically import stationsApi to avoid circular import issues
       const { stationsApi } = await import('../../services/stations')
@@ -260,7 +259,7 @@ export default function AddStationPage() {
                 <Building2 className="h-5 w-5 text-blue-600" />
                 Station Information
               </h3>
-              
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">Station Name *</label>
@@ -320,7 +319,7 @@ export default function AddStationPage() {
                 <Zap className="h-5 w-5 text-yellow-600" />
                 Technical Specifications
               </h3>
-              
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">Connector Type *</label>
@@ -353,6 +352,22 @@ export default function AddStationPage() {
                     />
                   </div>
 
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Price Per kWh *</label>
+                    <input
+                      type="number"
+                      name="pricePerKWh"
+                      value={form.pricePerKWh}
+                      onChange={handleChange}
+                      placeholder="e.g., 50.00"
+                      min="0"
+                      step="0.01"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium mb-2">Total Slots *</label>
                     <input
@@ -367,19 +382,6 @@ export default function AddStationPage() {
                     />
                   </div>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">Amenities</label>
-                  <input
-                    type="text"
-                    name="amenities"
-                    value={form.amenities}
-                    onChange={handleChange}
-                    placeholder="e.g., WiFi, Restroom, Cafe (comma-separated)"
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Separate multiple amenities with commas</p>
-                </div>
               </div>
             </div>
           </div>
@@ -390,7 +392,7 @@ export default function AddStationPage() {
                 <Navigation className="h-5 w-5 text-green-600" />
                 Location Coordinates
               </h3>
-              
+
               <div className="space-y-4">
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2">
                   <Info className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />

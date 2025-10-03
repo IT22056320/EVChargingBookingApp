@@ -9,6 +9,7 @@ export interface ChargingStationDto {
     connectorType: string
     totalSlots: number
     powerRatingKW: number
+    pricePerKWh: number
 }
 
 export interface ChargingStationResponse {
@@ -22,6 +23,7 @@ export interface ChargingStationResponse {
     connectorType: string
     totalSlots: number
     powerRatingKW: number
+    pricePerKWh: number
 }
 
 class ChargingStationApiService {

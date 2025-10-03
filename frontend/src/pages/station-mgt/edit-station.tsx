@@ -22,6 +22,7 @@ export default function EditStationPage() {
     longitude: '',
     connectorType: 'Type2',
     powerRatingKW: 0,
+    pricePerKWh: '',
     totalSlots: '',
     operatingHours: '24/7',
   })
@@ -46,6 +47,7 @@ export default function EditStationPage() {
         longitude: data.longitude.toString(),
         connectorType: data.connectorType,
         powerRatingKW: data.powerRatingKW,
+        pricePerKWh: data.pricePerKWh ? data.pricePerKWh.toString() : '',
         totalSlots: data.totalSlots.toString(),
         operatingHours: (data as any).operatingHours || '24/7',
       })
@@ -123,10 +125,11 @@ export default function EditStationPage() {
         longitude: parseFloat(form.longitude),
         connectorType: form.connectorType,
         powerRatingKW: form.powerRatingKW,
+        pricePerKWh: parseFloat(form.pricePerKWh),
         totalSlots: parseInt(form.totalSlots)
       }
-  const { stationsApi } = await import('../../services/stations')
-  await stationsApi.updateStation(id as string, payload)
+      const { stationsApi } = await import('../../services/stations')
+      await stationsApi.updateStation(id as string, payload)
       await Swal.fire({
         icon: 'success',
         title: 'Station Updated!',
@@ -256,6 +259,20 @@ export default function EditStationPage() {
                       placeholder="e.g., 50"
                       min="1"
                       step="0.1"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Price Per kWh *</label>
+                    <input
+                      type="number"
+                      name="pricePerKWh"
+                      value={form.pricePerKWh}
+                      onChange={handleChange}
+                      placeholder="e.g., 50.00"
+                      min="0"
+                      step="0.01"
                       className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       required
                     />
