@@ -1,4 +1,4 @@
-/*
+﻿/*
  * File: LoginActivity.kt
  * Description: Login activity for EV owners and station operators with Jetpack Compose
  * Author: EV Charging Team
@@ -53,6 +53,8 @@ class LoginActivity : ComponentActivity() {
         private const val KEY_IS_LOGGED_IN = "isLoggedIn"
         private const val KEY_USER_EMAIL = "userEmail"
         private const val KEY_USER_TYPE = "userType"
+        private const val KEY_USER_NAME = "userName"
+        private const val KEY_USER_NIC = "userNic"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -89,7 +91,7 @@ class LoginActivity : ComponentActivity() {
 
                 result.fold(
                     onSuccess = { loginResponse ->
-                        handleSuccessfulLogin(email, loginResponse)
+                        handleSuccessfulLogin(loginResponse)
                         onResult(true, "Login successful!")
                     },
                     onFailure = { exception ->
@@ -105,12 +107,21 @@ class LoginActivity : ComponentActivity() {
     /**
      * Handle successful login response - store user data and navigate based on user type
      */
-    private fun handleSuccessfulLogin(email: String, result: ApiService.UnifiedLoginResponse) {
+    private fun handleSuccessfulLogin(result: ApiService.UnifiedLoginResponse) {
         try {
+            val loggedInUser = result.user
+
+            loggedInUser?.let { user ->
+                databaseHelper.saveUser(user)
+            }
+
             sharedPreferences.edit().apply {
                 putBoolean(KEY_IS_LOGGED_IN, true)
-                putString(KEY_USER_EMAIL, email)
+                putString(KEY_USER_EMAIL, loggedInUser?.email ?: "")
                 putString(KEY_USER_TYPE, result.userType)
+                putString(KEY_USER_NAME, loggedInUser?.fullName ?: "")
+                putString(KEY_USER_NIC, loggedInUser?.nic ?: "")
+                putString("userAddress", loggedInUser?.address ?: "") // Store stationId for operators
                 apply()
             }
 
@@ -124,7 +135,6 @@ class LoginActivity : ComponentActivity() {
             Toast.makeText(this, "Failed to process login: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
-
     /**
      * Open registration activity
      */
@@ -179,7 +189,7 @@ fun LoginScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "⚡",
+                        text = "âš¡",
                         fontSize = 32.sp,
                         color = Color.White
                     )
@@ -329,3 +339,12 @@ fun LoginScreen(
         }
     }
 }
+
+
+
+
+
+
+
+
+
