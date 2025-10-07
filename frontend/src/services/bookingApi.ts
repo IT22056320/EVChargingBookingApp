@@ -84,13 +84,13 @@ export interface ChargingStationResponse {
 }
 
 export enum BookingStatus {
-  Pending = 0,
-  Approved = 1,
-  InProgress = 2,
-  Completed = 3,
-  Cancelled = 4,
-  Rejected = 5,
-  NoShow = 6
+  Pending = "Pending",
+  Approved = "Approved",
+  InProgress = "InProgress",
+  Completed = "Completed",
+  Cancelled = "Cancelled",
+  Rejected = "Rejected",
+  NoShow = "NoShow"
 }
 
 export enum ConnectorType {

@@ -18,6 +18,8 @@ import {
     AlertCircle,
     Building2
 } from 'lucide-react'
+import { useAuth } from '../../providers/auth-provider'
+import { UserRole } from '../../types'
 import toast from '../../utils/toast'
 
 import { StationDetailsModal, ChargingStation as ModalChargingStation } from '../../components/station-details-modal'
@@ -58,6 +60,7 @@ type StationStats = {
 export default function StationManagementPage() {
     const [stations, setStations] = useState<ChargingStation[]>([])
     const [isLoading, setIsLoading] = useState(true)
+    const { user } = useAuth()
 
     useEffect(() => {
         const fetchStations = async () => {
@@ -66,8 +69,26 @@ export default function StationManagementPage() {
                 // Import stationsApi from services
                 const { stationsApi } = await import('../../services/stations')
                 const data = await stationsApi.getStations()
+                
+                // Role-based filtering: Station Operators only see their assigned station
+                let filteredData = data
+                if (user?.role === UserRole.StationOperator) {
+                    // Get stationId from user profile (assigned by backoffice)
+                    const stationId = user.assignedStationId || localStorage.getItem('operatorStationId') || ''
+                    
+                    if (stationId) {
+                        // Save for future use
+                        localStorage.setItem('operatorStationId', stationId)
+                        filteredData = data.filter((station: any) => station.id === stationId)
+                        console.log(`Station Operator: Filtered ${data.length} stations to ${filteredData.length} for station ${stationId}`)
+                    } else {
+                        console.warn('Station Operator has no assigned station')
+                        filteredData = []
+                    }
+                }
+                
                 // Map ChargingStationResponse to ChargingStation
-                const mappedStations: ChargingStation[] = data.map((station: any) => ({
+                const mappedStations: ChargingStation[] = filteredData.map((station: any) => ({
                     id: station.id,
                     stationName: station.stationName,
                     location: station.location,

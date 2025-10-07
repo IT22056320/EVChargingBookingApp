@@ -3,6 +3,7 @@ import { AuthProvider } from '@/providers/auth-provider'
 import { NotificationProvider } from '@/providers/notification-provider'
 import { LoginPage } from '@/pages/auth/login'
 import { DashboardPage } from '@/pages/dashboard'
+import { OperatorDashboardPage } from '@/pages/operator-dashboard'
 import { BookingsPage } from '@/pages/bookings'
 import { CreateBookingPage } from '@/pages/create-booking'
 import { EVOwnersPage } from '@/pages/ev-owners'
@@ -28,6 +29,7 @@ function App() {
                   <Routes>
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/dashboard" element={<DashboardPage />} />
+                    <Route path="/operator-dashboard" element={<OperatorDashboardPage />} />
                     <Route path="/bookings" element={<BookingsPage />} />
                     <Route path="/create-booking" element={<CreateBookingPage />} />
                     <Route path="/ev-owners" element={<EVOwnersPage />} />

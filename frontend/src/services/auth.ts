@@ -27,7 +27,8 @@ export class AuthService {
           role: response.user.roleId,
           isActive: response.user.isActive,
           createdAt: response.user.createdAt,
-          lastLoginAt: response.user.lastLoginAt
+          lastLoginAt: response.user.lastLoginAt,
+          assignedStationId: response.user.assignedStationId // Include assigned station for operators
         }
 
         console.log('AuthService: Transformed user:', transformedUser)

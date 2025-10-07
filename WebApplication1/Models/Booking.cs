@@ -9,6 +9,7 @@
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using System.ComponentModel.DataAnnotations;
+using WebApplication1.Serializers;
 
 namespace WebApplication1.Models
 {
@@ -39,7 +40,7 @@ namespace WebApplication1.Models
         public string BookingNumber { get; set; } = string.Empty;
 
         [BsonElement("userId")]
-        [BsonRepresentation(BsonType.ObjectId)]
+        [BsonSerializer(typeof(FlexibleStringSerializer))]
         [Required]
         public string UserId { get; set; } = string.Empty;
 
@@ -159,10 +160,11 @@ namespace WebApplication1.Models
 
         /// <summary>
         /// Business rule: Check if booking can be modified (within 12 hours of start time)
+        /// EV owners can modify both Pending and Approved bookings with sufficient notice
         /// </summary>
         [BsonIgnore]
         public bool CanBeModified => 
-            Status == BookingStatus.Pending && 
+            (Status == BookingStatus.Pending || Status == BookingStatus.Approved) && 
             StartTime.Subtract(DateTime.UtcNow).TotalHours >= 12;
 
         /// <summary>

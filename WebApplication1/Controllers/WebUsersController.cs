@@ -61,7 +61,8 @@ namespace WebApplication1.Controllers
                     RoleId = (int)user.Role,
                     user.IsActive,
                     user.CreatedAt,
-                    LastLoginAt = DateTime.UtcNow
+                    LastLoginAt = DateTime.UtcNow,
+                    user.AssignedStationId // Include assigned station for operators
                 };
 
                 return Ok(new { 
@@ -97,7 +98,8 @@ namespace WebApplication1.Controllers
                     u.IsActive,
                     u.CreatedAt,
                     u.LastLoginAt,
-                    u.CreatedBy
+                    u.CreatedBy,
+                    u.AssignedStationId // Include assigned station for operators
                 }).ToList();
 
                 return Ok(sanitizedUsers);
@@ -143,7 +145,8 @@ namespace WebApplication1.Controllers
                     Role = request.Role,
                     IsActive = true,
                     CreatedAt = DateTime.UtcNow,
-                    CreatedBy = request.CreatedBy ?? "System"
+                    CreatedBy = request.CreatedBy ?? "System",
+                    AssignedStationId = request.AssignedStationId // Store assigned station for operators
                 };
 
                 await _mongoDBService.WebUsers.InsertOneAsync(newUser);
@@ -189,6 +192,43 @@ namespace WebApplication1.Controllers
                 return StatusCode(500, new { message = "Failed to update user status", error = ex.Message });
             }
         }
+
+        /// <summary>
+        /// Assign charging station to operator
+        /// </summary>
+        [HttpPatch("{id}/assign-station")]
+        public async Task<ActionResult> AssignStation(string id, [FromBody] AssignStationRequest request)
+        {
+            try
+            {
+                // Validate that user exists and is a Station Operator
+                var userFilter = Builders<WebUser>.Filter.Eq(u => u.Id, id);
+                var user = await _mongoDBService.WebUsers.Find(userFilter).FirstOrDefaultAsync();
+
+                if (user == null)
+                    return NotFound($"User with ID {id} not found");
+
+                if (user.Role != WebUserRole.StationOperator)
+                    return BadRequest("Only Station Operators can be assigned to charging stations");
+
+                // Update the assigned station
+                var update = Builders<WebUser>.Update.Set(u => u.AssignedStationId, request.StationId);
+                var result = await _mongoDBService.WebUsers.UpdateOneAsync(userFilter, update);
+
+                if (result.ModifiedCount == 0)
+                    return StatusCode(500, "Failed to assign station");
+
+                return Ok(new { 
+                    message = "Station assigned successfully",
+                    userId = id,
+                    assignedStationId = request.StationId
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Failed to assign station", error = ex.Message });
+            }
+        }
     }
 
     /// <summary>
@@ -210,5 +250,14 @@ namespace WebApplication1.Controllers
         public string Password { get; set; } = string.Empty;
         public WebUserRole Role { get; set; }
         public string? CreatedBy { get; set; }
+        public string? AssignedStationId { get; set; } // For Station Operators only
+    }
+
+    /// <summary>
+    /// Assign station request model
+    /// </summary>
+    public class AssignStationRequest
+    {
+        public string StationId { get; set; } = string.Empty;
     }
 }

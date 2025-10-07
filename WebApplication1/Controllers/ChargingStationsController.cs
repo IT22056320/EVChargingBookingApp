@@ -82,6 +82,66 @@ namespace WebApplication1.Controllers
             if (!result.Success) return BadRequest(result.Message);
             return Ok(new { message = result.Message });
         }
+
+        // Gets slot availability for a charging station within a time range
+        [HttpGet("{id}/availability")]
+        public async Task<IActionResult> GetSlotAvailability(
+            string id,
+            [FromQuery] DateTime startTime,
+            [FromQuery] DateTime endTime)
+        {
+            try
+            {
+                // Validate time range
+                if (startTime >= endTime)
+                {
+                    return BadRequest(new { message = "Start time must be before end time" });
+                }
+
+                if (startTime < DateTime.Now)
+                {
+                    return BadRequest(new { message = "Start time cannot be in the past" });
+                }
+
+                // Verify station exists
+                var station = await _stationService.GetByIdAsync(id);
+                if (station == null)
+                {
+                    return NotFound(new { message = "Charging station not found" });
+                }
+
+                if (!station.IsAvailable)
+                {
+                    return Ok(new
+                    {
+                        availableSlots = 0,
+                        totalSlots = station.TotalSlots,
+                        occupiedSlots = station.TotalSlots,
+                        message = "Station is currently unavailable"
+                    });
+                }
+
+                // Get slot availability from booking service
+                var (availableSlots, totalSlots, occupiedSlots) = await _bookingService.GetAvailableSlotsAsync(
+                    id,
+                    startTime,
+                    endTime
+                );
+
+                return Ok(new
+                {
+                    availableSlots,
+                    totalSlots,
+                    occupiedSlots,
+                    startTime,
+                    endTime
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = $"Error checking slot availability: {ex.Message}" });
+            }
+        }
     }
 
 }

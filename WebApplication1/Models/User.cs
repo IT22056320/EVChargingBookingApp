@@ -38,6 +38,12 @@ namespace WebApplication1.Models
         [BsonElement("address")]
         public string Address { get; set; } = string.Empty;
 
+        [BsonElement("latitude")]
+        public double? Latitude { get; set; }
+
+        [BsonElement("longitude")]
+        public double? Longitude { get; set; }
+
         [BsonElement("isActive")]
         public bool IsActive { get; set; } = true;
 

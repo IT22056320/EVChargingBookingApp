@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../providers/auth-provider'
 import { useNotifications } from '../providers/notification-provider'
 import { bookingApi, BookingResponse, BookingStatus, BookingStats } from '../services/bookingApi'
+import { UserRole } from '../types'
 import toast from '../utils/toast'
 import { 
   Calendar, 
@@ -76,10 +77,30 @@ export function BookingsPage() {
         sortDescending: true
       })
       
-      setBookings(result.bookings)
+      // Role-based filtering: Station Operators only see bookings for their assigned station
+      let filteredResult = result.bookings
+      if (user?.role === UserRole.StationOperator) {
+        // Get stationId from user profile (assigned by backoffice)
+        const stationId = user.assignedStationId || localStorage.getItem('operatorStationId') || ''
+        
+        if (stationId) {
+          // Save for future use
+          localStorage.setItem('operatorStationId', stationId)
+          
+          filteredResult = result.bookings.filter(
+            booking => booking.chargingStationId === stationId
+          )
+          console.log(`Station Operator: Filtered ${result.bookings.length} bookings to ${filteredResult.length} for station ${stationId}`)
+        } else {
+          console.warn('Station Operator has no assigned station')
+          filteredResult = []
+        }
+      }
+      
+      setBookings(filteredResult)
       setTotalPages(result.totalPages)
       
-      toast.success(`Loaded ${result.bookings.length} bookings`)
+      toast.success(`Loaded ${filteredResult.length} bookings`)
     } catch (error) {
       console.error('Failed to load bookings:', error)
       toast.error('Failed to load bookings')
