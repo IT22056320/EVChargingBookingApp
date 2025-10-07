@@ -80,12 +80,6 @@ namespace WebApplication1.Models
         [BsonElement("operatorId")]
         public string OperatorId { get; set; } = string.Empty;
 
-        [BsonElement("description")]
-        public string Description { get; set; } = string.Empty;
-
-        [BsonElement("amenities")]
-        public List<string> Amenities { get; set; } = new List<string>();
-
         [BsonElement("operatingHours")]
         public string OperatingHours { get; set; } = "24/7";
 
@@ -93,7 +87,7 @@ namespace WebApplication1.Models
         public bool IsAvailable { get; set; } = true;
 
         [BsonElement("maxBookingDurationMinutes")]
-        public int MaxBookingDurationMinutes { get; set; } = 240; // 4 hours default
+        public int MaxBookingDurationMinutes { get; set; } = 240;
 
         [BsonElement("availableSlots")]
         [Required]
@@ -110,14 +104,6 @@ namespace WebApplication1.Models
         [BsonDateTimeOptions(Kind = DateTimeKind.Utc)]
         public DateTime? UpdatedAt { get; set; }
 
-        [BsonElement("lastMaintenanceDate")]
-        [BsonDateTimeOptions(Kind = DateTimeKind.Utc)]
-        public DateTime? LastMaintenanceDate { get; set; }
-
-        [BsonElement("nextMaintenanceDate")]
-        [BsonDateTimeOptions(Kind = DateTimeKind.Utc)]
-        public DateTime? NextMaintenanceDate { get; set; }
-
         /// <summary>
         /// Navigation properties (not stored in MongoDB)
         /// </summary>
@@ -130,12 +116,5 @@ namespace WebApplication1.Models
         [BsonIgnore]
         public bool IsBookingAvailable => 
             Status == ChargingStationStatus.Active && IsAvailable;
-
-        /// <summary>
-        /// Checks if the station requires maintenance.
-        /// </summary>
-        [BsonIgnore]
-        public bool RequiresMaintenance => 
-            NextMaintenanceDate.HasValue && NextMaintenanceDate.Value <= DateTime.UtcNow;
     }
 }

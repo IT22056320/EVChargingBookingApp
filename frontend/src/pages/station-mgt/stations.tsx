@@ -36,6 +36,7 @@ type ChargingStation = {
     longitude: number
     connectorType: ConnectorType
     powerRatingKW: number
+    pricePerKWh: number
     availableSlots: number
     totalSlots: number
     isAvailable: boolean
@@ -97,6 +98,7 @@ export default function StationManagementPage() {
                     longitude: station.longitude,
                     connectorType: station.connectorType,
                     powerRatingKW: station.powerRatingKW ?? 0,
+                    pricePerKWh: station.pricePerKWh ?? 0,
                     availableSlots: station.availableSlots ?? 0,
                     totalSlots: station.totalSlots ?? 0,
                     isAvailable: station.isAvailable ?? false,
@@ -202,6 +204,7 @@ export default function StationManagementPage() {
                 connectorType: station.connectorType,
                 totalSlots: station.totalSlots,
                 powerRatingKW: station.powerRatingKW,
+                pricePerKWh: station.pricePerKWh,
                 isAvailable: !station.isAvailable
             }
             await stationsApi.updateStation(stationId, payload)
@@ -366,6 +369,7 @@ export default function StationManagementPage() {
                                     <th className="text-left p-4 font-medium text-sm">Connector</th>
                                     <th className="text-left p-4 font-medium text-sm">Slots</th>
                                     <th className="text-left p-4 font-medium text-sm">Power</th>
+                                    <th className="text-left p-4 font-medium text-sm">Price/kWh</th>
                                     <th className="text-left p-4 font-medium text-sm">Status</th>
                                     <th className="text-center p-4 font-medium text-sm">Actions</th>
                                 </tr>
@@ -409,6 +413,9 @@ export default function StationManagementPage() {
                                         </td>
                                         <td className="p-4">
                                             <span className="text-sm">{station.powerRatingKW} kW</span>
+                                        </td>
+                                        <td className="p-4">
+                                            <span className="text-sm">{station.pricePerKWh?.toFixed?.(2) ?? station.pricePerKWh ?? '-'} LKR</span>
                                         </td>
                                         <td className="p-4">
                                             {station.isAvailable ? (

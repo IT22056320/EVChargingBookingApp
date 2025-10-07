@@ -133,8 +133,6 @@ namespace WebApplication1.Services
                 PricePerKWh = station.PricePerKWh,
                 Status = station.Status.ToString(),
                 OperatorId = station.OperatorId,
-                Description = station.Description,
-                Amenities = station.Amenities,
                 OperatingHours = station.OperatingHours,
                 IsAvailable = station.IsAvailable,
                 TotalSlots = station.TotalSlots, 
@@ -142,8 +140,6 @@ namespace WebApplication1.Services
                 AvailableSlots = station.AvailableSlots,
                 CreatedAt = station.CreatedAt,
                 UpdatedAt = station.UpdatedAt,
-                LastMaintenanceDate = station.LastMaintenanceDate,
-                NextMaintenanceDate = station.NextMaintenanceDate
             };
         }
 
@@ -165,8 +161,6 @@ namespace WebApplication1.Services
                 Status = Enum.TryParse<ChargingStationStatus>(dto.Status, out var status)
                                 ? status : ChargingStationStatus.Active,
                 OperatorId = dto.OperatorId,
-                Description = dto.Description,
-                Amenities = dto.Amenities,
                 OperatingHours = dto.OperatingHours,
                 IsAvailable = dto.IsAvailable,
                 MaxBookingDurationMinutes = dto.MaxBookingDurationMinutes,
@@ -174,8 +168,6 @@ namespace WebApplication1.Services
                 AvailableSlots = dto.TotalSlots,
                 CreatedAt = dto.CreatedAt,
                 UpdatedAt = dto.UpdatedAt,
-                LastMaintenanceDate = dto.LastMaintenanceDate,
-                NextMaintenanceDate = dto.NextMaintenanceDate
             };
         }
 

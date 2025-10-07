@@ -19,6 +19,7 @@ export type ChargingStation = {
     longitude: number
     connectorType: string
     powerRatingKW: number
+    pricePerKWh: number
     availableSlots: number
     totalSlots: number
     isAvailable: boolean
@@ -127,11 +128,12 @@ export const StationDetailsModal: React.FC<StationDetailsModalProps> = ({
                                 <Plug className="h-4 w-4 text-yellow-600" />
                                 Technical Specifications
                             </h4>
-                            <div className="space-y-2 text-sm">
-                                <p><span className="text-gray-600">Connector Type:</span> <span className="font-medium">{getConnectorTypeLabel(station.connectorType)}</span></p>
-                                <p><span className="text-gray-600">Power Rating (kW):</span> <span className="font-medium">{station.powerRatingKW}</span></p>
-                                <p><span className="text-gray-600">Total Slots:</span> <span className="font-medium">{station.totalSlots}</span></p>
-                                <p><span className="text-gray-600">Available Slots:</span> <span className={`font-medium ${station.availableSlots > 0 ? 'text-green-600' : 'text-red-600'}`}>{station.availableSlots}</span></p>
+                                <div className="space-y-2 text-sm">
+                                    <p><span className="text-gray-600">Connector Type:</span> <span className="font-medium">{getConnectorTypeLabel(station.connectorType)}</span></p>
+                                    <p><span className="text-gray-600">Power Rating (kW):</span> <span className="font-medium">{station.powerRatingKW}</span></p>
+                                    <p><span className="text-gray-600">Total Slots:</span> <span className="font-medium">{station.totalSlots}</span></p>
+                                    <p><span className="text-gray-600">Available Slots:</span> <span className={`font-medium ${station.availableSlots > 0 ? 'text-green-600' : 'text-red-600'}`}>{station.availableSlots}</span></p>
+                                    <p><span className="text-gray-600">Price Per kWh:</span> <span className="font-medium">LKR {station.pricePerKWh?.toFixed?.(2) ?? station.pricePerKWh ?? '-'}</span></p>
                             </div>
                         </div>
                     </div>

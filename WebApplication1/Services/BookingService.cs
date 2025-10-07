@@ -1141,8 +1141,6 @@ namespace WebApplication1.Services
                         PowerRatingKW = station.PowerRatingKW,
                         PricePerKWh = station.PricePerKWh,
                         Status = station.Status.ToString(),
-                        Description = station.Description,
-                        Amenities = station.Amenities,
                         OperatingHours = station.OperatingHours,
                         IsAvailable = station.IsAvailable,
                         MaxBookingDurationMinutes = station.MaxBookingDurationMinutes,
