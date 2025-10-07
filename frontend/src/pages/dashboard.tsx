@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../providers/auth-provider'
 import { dashboardApi, DashboardStatistics, ActivityLog } from '../services/dashboardApi'
 import { UserRole } from '../types'
@@ -7,13 +8,19 @@ import { Users, UserCheck, Clock, Car, Shield, Activity, Zap, ArrowUpRight, Arro
 
 export function DashboardPage() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [statistics, setStatistics] = useState<DashboardStatistics | null>(null)
   const [activities, setActivities] = useState<ActivityLog[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    // Redirect Station Operators to their dedicated dashboard
+    if (user?.role === UserRole.StationOperator) {
+      navigate('/operator-dashboard')
+      return
+    }
     loadDashboardData()
-  }, [])
+  }, [user, navigate])
 
   const loadDashboardData = async () => {
     setIsLoading(true)

@@ -14,6 +14,8 @@ data class User(
     var password: String? = null,
     var phoneNumber: String? = null,
     var address: String? = null,
+    var latitude: Double? = null,  // Location coordinates for nearby stations
+    var longitude: Double? = null,
     var isActive: Boolean = true,
     var isApproved: Boolean = false,
     var registeredAt: String? = null,

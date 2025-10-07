@@ -7,6 +7,7 @@ export interface User {
   isActive: boolean
   createdAt: string
   lastLoginAt?: string
+  assignedStationId?: string // Charging station ID for Station Operators
 }
 
 export enum UserRole {

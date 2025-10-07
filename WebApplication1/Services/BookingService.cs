@@ -48,7 +48,19 @@ namespace WebApplication1.Services
                     return (false, validationResult.Message, null);
                 }
 
-                // Check for booking conflicts
+                // ✅ NEW: Check if slots are available for the requested time range
+                var (slotsAvailable, availableSlots) = await CheckSlotAvailabilityAsync(
+                    createBookingDto.ChargingStationId,
+                    createBookingDto.StartTime,
+                    createBookingDto.EndTime
+                );
+
+                if (!slotsAvailable)
+                {
+                    return (false, $"No available slots at this station for the selected time. Available slots: {availableSlots}", null);
+                }
+
+                // Check for booking conflicts (additional validation)
                 var hasConflict = await HasBookingConflictAsync(
                     createBookingDto.ChargingStationId,
                     createBookingDto.StartTime,
@@ -104,8 +116,11 @@ namespace WebApplication1.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating booking");
-                return (false, "An error occurred while creating the booking", null);
+                _logger.LogError(ex, "Error creating booking. Details: {Message}. StackTrace: {StackTrace}", ex.Message, ex.StackTrace);
+                _logger.LogError("BookingDto: UserId={UserId}, StationId={StationId}, Date={Date}, StartTime={StartTime}, EndTime={EndTime}", 
+                    createBookingDto.UserId, createBookingDto.ChargingStationId, createBookingDto.BookingDate, 
+                    createBookingDto.StartTime, createBookingDto.EndTime);
+                return (false, $"An error occurred while creating the booking: {ex.Message}", null);
             }
         }
 
@@ -592,6 +607,19 @@ namespace WebApplication1.Services
                     return (false, "Only pending bookings can be approved");
                 }
 
+                // Re-validate slot availability before approval to prevent race conditions
+                var (slotsAvailable, availableSlots) = await CheckSlotAvailabilityAsync(
+                    existingBooking.ChargingStationId,
+                    existingBooking.StartTime,
+                    existingBooking.EndTime
+                );
+
+                if (!slotsAvailable)
+                {
+                    _logger.LogWarning($"Cannot approve booking {bookingId}: No available slots. Available: {availableSlots}");
+                    return (false, $"Cannot approve booking: No available slots for the selected time range. Available slots: {availableSlots}");
+                }
+
                 var updateDefinition = Builders<Booking>.Update
                     .Set(b => b.Status, BookingStatus.Approved)
                     .Set(b => b.ApprovedAt, DateTime.UtcNow)
@@ -844,7 +872,128 @@ namespace WebApplication1.Services
             }
         }
 
+        /// <summary>
+        /// Check if there are active bookings for the charging station
+        /// </summary>
+        public async Task<bool> HasActiveBookingsAsync(string chargingStationId)
+        {
+            // Query for bookings at this station with status ACTIVE or CONFIRMED
+            var filter = Builders<Booking>.Filter.Eq(b => b.ChargingStationId, chargingStationId) &
+                         Builders<Booking>.Filter.In(b => b.Status, new[] { BookingStatus.Pending, BookingStatus.Approved });
+
+            var count = await _mongoDBService.Bookings.CountDocumentsAsync(filter);
+            return count > 0;
+        }
+
+        /// <summary>
+        /// Get available slots for a charging station at a specific time range (public API method)
+        /// </summary>
+        public async Task<(int AvailableSlots, int TotalSlots, int OccupiedSlots)> GetAvailableSlotsAsync(
+            string chargingStationId,
+            DateTime startTime,
+            DateTime endTime)
+        {
+            try
+            {
+                // Get the charging station
+                var station = await _mongoDBService.ChargingStations
+                    .Find(cs => cs.Id == chargingStationId)
+                    .FirstOrDefaultAsync();
+
+                if (station == null)
+                {
+                    _logger.LogWarning($"Station {chargingStationId} not found");
+                    return (0, 0, 0);
+                }
+
+                // Get all active bookings that overlap with the requested time
+                // Only Pending and Approved bookings occupy slots
+                var overlappingBookingsFilter = Builders<Booking>.Filter.And(
+                    Builders<Booking>.Filter.Eq(b => b.ChargingStationId, chargingStationId),
+                    Builders<Booking>.Filter.In(b => b.Status, new[] {
+                        BookingStatus.Pending,
+                        BookingStatus.Approved
+                    }),
+                    Builders<Booking>.Filter.And(
+                        Builders<Booking>.Filter.Lt(b => b.StartTime, endTime),
+                        Builders<Booking>.Filter.Gt(b => b.EndTime, startTime)
+                    )
+                );
+
+                var overlappingBookings = await _mongoDBService.Bookings
+                    .Find(overlappingBookingsFilter)
+                    .ToListAsync();
+
+                int occupiedSlots = overlappingBookings.Count;
+                int availableSlots = station.TotalSlots - occupiedSlots;
+
+                return (availableSlots, station.TotalSlots, occupiedSlots);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error getting available slots for station {chargingStationId}");
+                return (0, 0, 0);
+            }
+        }
+
         #region Private Methods
+
+        /// <summary>
+        /// Check if slots are available for the requested time range (time-based slot management)
+        /// </summary>
+        private async Task<(bool Available, int AvailableSlots)> CheckSlotAvailabilityAsync(
+            string chargingStationId,
+            DateTime startTime,
+            DateTime endTime)
+        {
+            try
+            {
+                // Get the charging station
+                var station = await _mongoDBService.ChargingStations
+                    .Find(cs => cs.Id == chargingStationId)
+                    .FirstOrDefaultAsync();
+
+                if (station == null)
+                {
+                    _logger.LogWarning($"Station {chargingStationId} not found for slot availability check");
+                    return (false, 0);
+                }
+
+                // Get all active bookings (not cancelled or completed) that overlap with the requested time
+                // Only Pending and Approved bookings occupy slots
+                var overlappingBookingsFilter = Builders<Booking>.Filter.And(
+                    Builders<Booking>.Filter.Eq(b => b.ChargingStationId, chargingStationId),
+                    Builders<Booking>.Filter.In(b => b.Status, new[] {
+                        BookingStatus.Pending,
+                        BookingStatus.Approved
+                    }),
+                    // Time overlap logic: booking overlaps if it starts before our end time AND ends after our start time
+                    Builders<Booking>.Filter.And(
+                        Builders<Booking>.Filter.Lt(b => b.StartTime, endTime),
+                        Builders<Booking>.Filter.Gt(b => b.EndTime, startTime)
+                    )
+                );
+
+                var overlappingBookings = await _mongoDBService.Bookings
+                    .Find(overlappingBookingsFilter)
+                    .ToListAsync();
+
+                int occupiedSlots = overlappingBookings.Count;
+                int availableSlots = station.TotalSlots - occupiedSlots;
+
+                _logger.LogInformation(
+                    $"Slot availability check for station {chargingStationId} ({station.StationName}): " +
+                    $"Total={station.TotalSlots}, Occupied={occupiedSlots}, Available={availableSlots}, " +
+                    $"TimeRange={startTime:yyyy-MM-dd HH:mm} to {endTime:yyyy-MM-dd HH:mm}");
+
+                return (availableSlots > 0, availableSlots);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error checking slot availability for station {chargingStationId}");
+                return (false, 0);
+            }
+        }
 
         /// <summary>
         /// Validate booking business rules
@@ -950,7 +1099,7 @@ namespace WebApplication1.Services
             try
             {
                 var user = await _mongoDBService.EVOwners
-                    .Find(u => u.Id == booking.UserId)
+                    .Find(u => u.NIC == booking.UserId)
                     .FirstOrDefaultAsync();
 
                 if (user != null)
