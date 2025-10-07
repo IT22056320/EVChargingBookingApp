@@ -80,9 +80,20 @@ namespace WebApplication1.Services
         }
 
         /// <summary>
-        /// Validate QR code and get booking information
+        /// Validate QR code and get booking information (without station validation)
         /// </summary>
         public async Task<(bool IsValid, string Message, Booking? Booking)> ValidateQRCodeAsync(string qrCodeData)
+        {
+            return await ValidateQRCodeAsync(qrCodeData, null);
+        }
+
+        /// <summary>
+        /// Validate QR code with station validation (for operators)
+        /// </summary>
+        /// <param name="qrCodeData">QR code data string</param>
+        /// <param name="operatorStationId">Station ID of the operator scanning the QR (null to skip station check)</param>
+        /// <returns>Validation result with booking information</returns>
+        public async Task<(bool IsValid, string Message, Booking? Booking)> ValidateQRCodeAsync(string qrCodeData, string? operatorStationId)
         {
             try
             {
@@ -102,6 +113,19 @@ namespace WebApplication1.Services
                     return (false, "Booking not found", null);
                 }
 
+                // SECURITY CHECK: Validate that the booking belongs to the operator's station
+                if (!string.IsNullOrEmpty(operatorStationId))
+                {
+                    if (booking.ChargingStationId != operatorStationId)
+                    {
+                        _logger.LogWarning(
+                            $"SECURITY VIOLATION: Operator at station {operatorStationId} attempted to scan QR code " +
+                            $"for booking {bookingId} which belongs to station {booking.ChargingStationId}"
+                        );
+                        return (false, "This booking belongs to a different charging station. You can only scan QR codes for your assigned station.", booking);
+                    }
+                }
+
                 if (booking.Status != BookingStatus.Approved)
                 {
                     return (false, $"Booking is not approved. Current status: {booking.Status}", booking);
@@ -119,6 +143,7 @@ namespace WebApplication1.Services
                     return (false, "Booking time has expired", booking);
                 }
 
+                _logger.LogInformation($"QR code validated successfully for booking {bookingId} at station {booking.ChargingStationId}");
                 return (true, "QR code is valid", booking);
             }
             catch (Exception ex)
