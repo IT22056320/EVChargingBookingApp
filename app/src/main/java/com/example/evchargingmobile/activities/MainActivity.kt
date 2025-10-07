@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import kotlinx.coroutines.delay
 import com.example.evchargingmobile.ui.theme.EVChargingTheme
 import com.example.evchargingmobile.ui.theme.EVBlue
@@ -44,6 +45,9 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Install splash screen before calling super.onCreate
+        installSplashScreen()
+        
         super.onCreate(savedInstanceState)
 
         // Initialize shared preferences for session management

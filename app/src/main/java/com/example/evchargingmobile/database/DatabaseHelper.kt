@@ -18,7 +18,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
 
     companion object {
         private const val DATABASE_NAME = "EVChargingApp.db"
-        private const val DATABASE_VERSION = 1
+        private const val DATABASE_VERSION = 2  // Incremented for latitude/longitude columns
 
         // Table names
         private const val TABLE_USERS = "users"
@@ -33,6 +33,8 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         private const val USER_PASSWORD = "password"
         private const val USER_PHONE = "phone_number"
         private const val USER_ADDRESS = "address"
+        private const val USER_LATITUDE = "latitude"
+        private const val USER_LONGITUDE = "longitude"
         private const val USER_IS_ACTIVE = "is_active"
         private const val USER_IS_APPROVED = "is_approved"
         private const val USER_TYPE = "user_type"
@@ -71,6 +73,8 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
                 $USER_PASSWORD TEXT,
                 $USER_PHONE TEXT,
                 $USER_ADDRESS TEXT,
+                $USER_LATITUDE REAL,
+                $USER_LONGITUDE REAL,
                 $USER_IS_ACTIVE INTEGER,
                 $USER_IS_APPROVED INTEGER,
                 $USER_TYPE TEXT,
@@ -113,10 +117,19 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_USERS")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_BOOKINGS")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_CHARGING_STATIONS")
-        onCreate(db)
+        // Migrate from version 1 to 2 (add latitude/longitude columns)
+        if (oldVersion < 2) {
+            db.execSQL("ALTER TABLE $TABLE_USERS ADD COLUMN $USER_LATITUDE REAL")
+            db.execSQL("ALTER TABLE $TABLE_USERS ADD COLUMN $USER_LONGITUDE REAL")
+        }
+        
+        // For any other version upgrades, drop and recreate
+        if (oldVersion < newVersion && oldVersion < 1) {
+            db.execSQL("DROP TABLE IF EXISTS $TABLE_USERS")
+            db.execSQL("DROP TABLE IF EXISTS $TABLE_BOOKINGS")
+            db.execSQL("DROP TABLE IF EXISTS $TABLE_CHARGING_STATIONS")
+            onCreate(db)
+        }
     }
 
     /**
@@ -132,6 +145,8 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
             put(USER_PASSWORD, user.password)
             put(USER_PHONE, user.phoneNumber)
             put(USER_ADDRESS, user.address)
+            user.latitude?.let { put(USER_LATITUDE, it) }
+            user.longitude?.let { put(USER_LONGITUDE, it) }
             put(USER_IS_ACTIVE, if (user.isActive) 1 else 0)
             put(USER_IS_APPROVED, if (user.isApproved) 1 else 0)
             put(USER_TYPE, user.userType.toString())
@@ -165,6 +180,15 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
                     password = it.getString(it.getColumnIndexOrThrow(USER_PASSWORD))
                     phoneNumber = it.getString(it.getColumnIndexOrThrow(USER_PHONE))
                     address = it.getString(it.getColumnIndexOrThrow(USER_ADDRESS))
+                    // Read latitude and longitude
+                    val latIndex = it.getColumnIndex(USER_LATITUDE)
+                    val lngIndex = it.getColumnIndex(USER_LONGITUDE)
+                    if (latIndex != -1 && !it.isNull(latIndex)) {
+                        latitude = it.getDouble(latIndex)
+                    }
+                    if (lngIndex != -1 && !it.isNull(lngIndex)) {
+                        longitude = it.getDouble(lngIndex)
+                    }
                     isActive = it.getInt(it.getColumnIndexOrThrow(USER_IS_ACTIVE)) == 1
                     isApproved = it.getInt(it.getColumnIndexOrThrow(USER_IS_APPROVED)) == 1
                     userType = User.UserType.valueOf(it.getString(it.getColumnIndexOrThrow(USER_TYPE)))
@@ -281,6 +305,27 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         }
 
         val result = db.insertWithOnConflict(TABLE_CHARGING_STATIONS, null, values, SQLiteDatabase.CONFLICT_REPLACE)
+        db.close()
+        return result
+    }
+
+    /**
+     * Update user profile (phone, address, and coordinates)
+     */
+    fun updateUserProfile(nic: String, phone: String, address: String, latitude: Double?, longitude: Double?): Int {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            put(USER_PHONE, phone)
+            put(USER_ADDRESS, address)
+            if (latitude != null) {
+                put(USER_LATITUDE, latitude)
+            }
+            if (longitude != null) {
+                put(USER_LONGITUDE, longitude)
+            }
+        }
+
+        val result = db.update(TABLE_USERS, values, "$USER_NIC=?", arrayOf(nic))
         db.close()
         return result
     }

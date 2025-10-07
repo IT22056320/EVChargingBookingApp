@@ -44,6 +44,8 @@ namespace WebApplication1.DTOs
         public string Password { get; set; } = string.Empty;
         public string PhoneNumber { get; set; } = string.Empty;
         public string Address { get; set; } = string.Empty;
+        public double? Latitude { get; set; }
+        public double? Longitude { get; set; }
     }
 
     /// <summary>
@@ -76,12 +78,32 @@ namespace WebApplication1.DTOs
     }
 
     /// <summary>
+    /// EV Owner login request model - Email-based authentication
+    /// </summary>
+    public class LoginEVOwnerRequest
+    {
+        public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+    }
+
+    /// <summary>
     /// Approval request model
     /// </summary>
     public class ApprovalRequest
     {
         public bool IsApproved { get; set; }
         public string? ApprovedBy { get; set; }
+    }
+
+    /// <summary>
+    /// Update EV Owner profile request (from mobile app)
+    /// </summary>
+    public class UpdateEVOwnerProfileRequest
+    {
+        public string PhoneNumber { get; set; } = string.Empty;
+        public string Address { get; set; } = string.Empty;
+        public double? Latitude { get; set; }
+        public double? Longitude { get; set; }
     }
 
     /// <summary>

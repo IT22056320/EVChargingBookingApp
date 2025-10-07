@@ -39,6 +39,8 @@ import com.example.evchargingmobile.network.ApiService
 import com.example.evchargingmobile.ui.theme.EVChargingTheme
 import com.example.evchargingmobile.ui.theme.EVBlue
 import com.example.evchargingmobile.ui.theme.EVGreen
+import com.example.evchargingmobile.ui.components.LocationPickerField
+import com.example.evchargingmobile.ui.components.LocationData
 import kotlinx.coroutines.launch
 
 class RegisterActivity : ComponentActivity() {
@@ -79,6 +81,8 @@ class RegisterActivity : ComponentActivity() {
         password: String,
         phone: String,
         address: String,
+        latitude: Double?,
+        longitude: Double?,
         onResult: (Boolean, String) -> Unit
     ) {
         val user = User(
@@ -88,6 +92,8 @@ class RegisterActivity : ComponentActivity() {
             password = password,
             phoneNumber = phone,
             address = address,
+            latitude = latitude,
+            longitude = longitude,
             userType = User.UserType.EV_OWNER
         )
 
@@ -114,7 +120,7 @@ class RegisterActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RegisterScreen(
-    onRegister: (String, String, String, String, String, String, (Boolean, String) -> Unit) -> Unit,
+    onRegister: (String, String, String, String, String, String, Double?, Double?, (Boolean, String) -> Unit) -> Unit,
     onBackToLogin: () -> Unit
 ) {
     var nic by remember { mutableStateOf("") }
@@ -124,6 +130,8 @@ fun RegisterScreen(
     var confirmPassword by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("") }
+    var latitude by remember { mutableStateOf<Double?>(null) }
+    var longitude by remember { mutableStateOf<Double?>(null) }
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
@@ -278,20 +286,17 @@ fun RegisterScreen(
                         singleLine = true
                     )
 
-                    // Address Input
-                    OutlinedTextField(
-                        value = address,
-                        onValueChange = { address = it },
-                        label = { Text("Address") },
-                        placeholder = { Text("Enter your address") },
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = EVBlue,
-                            focusedLabelColor = EVBlue
-                        ),
-                        minLines = 2,
-                        maxLines = 3
+                    // Address Input with Location Picker
+                    LocationPickerField(
+                        label = "Address",
+                        placeholder = "Select your location",
+                        initialAddress = address,
+                        onLocationSelected = { locationData ->
+                            address = locationData.address
+                            latitude = locationData.latitude
+                            longitude = locationData.longitude
+                        },
+                        modifier = Modifier.fillMaxWidth()
                     )
 
                     // Password Input
@@ -371,7 +376,7 @@ fun RegisterScreen(
                                 else -> {
                                     errorMessage = ""
                                     isLoading = true
-                                    onRegister(nic, fullName, email, password, phone, address) { success, message ->
+                                    onRegister(nic, fullName, email, password, phone, address, latitude, longitude) { success, message ->
                                         isLoading = false
                                         if (success) {
                                             showSuccessDialog = true

@@ -1,14 +1,28 @@
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { useAuth } from '@/providers/auth-provider'
+import { UserRole } from '@/types'
 
 export function Sidebar() {
   const location = useLocation()
+  const { user } = useAuth()
 
-  const navigation = [
+  // Role-based navigation
+  const backofficeNavigation = [
     { name: 'Dashboard', href: '/dashboard', current: location.pathname === '/dashboard' },
     { name: 'Bookings', href: '/bookings', current: location.pathname === '/bookings' },
     { name: 'EV Owners', href: '/ev-owners', current: location.pathname === '/ev-owners' },
+    { name: "Charging Stations", href: "/stations", current: location.pathname === "/stations" },
   ]
+
+  const operatorNavigation = [
+    { name: 'Dashboard', href: '/operator-dashboard', current: location.pathname === '/operator-dashboard' },
+    { name: 'Bookings', href: '/bookings', current: location.pathname === '/bookings' },
+    { name: "My Station", href: "/stations", current: location.pathname === "/stations" },
+  ]
+
+  // Select navigation based on role
+  const navigation = user?.role === UserRole.StationOperator ? operatorNavigation : backofficeNavigation
 
   return (
     <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-64 lg:flex-col">

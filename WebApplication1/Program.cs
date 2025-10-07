@@ -1,10 +1,16 @@
 using WebApplication1.Services;
 using WebApplication1.Hubs;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // Serialize enums as strings instead of integers
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -15,6 +21,7 @@ builder.Services.AddScoped<BookingService>();
 builder.Services.AddScoped<BookingNumberService>();
 builder.Services.AddScoped<QRCodeService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<ChargingStationService>();
 
 // Add SignalR
 builder.Services.AddSignalR();
@@ -24,16 +31,26 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowWebApp",
         policy =>
         {
-            policy.WithOrigins(
-                    "https://localhost:7000", 
-                    "http://localhost:5000",
-                    "http://localhost:3000",
-                    "http://localhost:3001",
-                    "http://localhost:3002"
-                  )
-                  .AllowAnyHeader()
-                  .AllowAnyMethod()
-                  .AllowCredentials(); // Required for SignalR
+            // Allow all origins in development for mobile app testing
+            if (builder.Environment.IsDevelopment())
+            {
+                policy.AllowAnyOrigin()
+                      .AllowAnyHeader()
+                      .AllowAnyMethod();
+            }
+            else
+            {
+                policy.WithOrigins(
+                        "https://localhost:7000", 
+                        "http://localhost:5000",
+                        "http://localhost:3000",
+                        "http://localhost:3001",
+                        "http://localhost:3002"
+                      )
+                      .AllowAnyHeader()
+                      .AllowAnyMethod()
+                      .AllowCredentials();
+            }
         });
 });
 
