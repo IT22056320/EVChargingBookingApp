@@ -431,6 +431,217 @@ namespace WebApplication1.Controllers
             }
         }
 
+        #region Booking Modification Endpoints
+
+        /// <summary>
+        /// Customer requests a booking modification (requires admin approval)
+        /// </summary>
+        /// <param name="id">Booking ID</param>
+        /// <param name="modificationDto">Modification request details</param>
+        /// <param name="userId">User ID making the request</param>
+        /// <returns>Modification request status</returns>
+        [HttpPost("{id}/request-modification")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> RequestBookingModification(
+            string id, 
+            [FromBody] RequestBookingModificationDto modificationDto,
+            [FromQuery] [Required] string userId)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return BadRequest("userId parameter is required");
+                }
+
+                var result = await _bookingService.RequestBookingModificationAsync(id, modificationDto, userId);
+
+                if (!result.Success)
+                {
+                    if (result.Message.Contains("not found"))
+                    {
+                        return NotFound(result.Message);
+                    }
+                    return BadRequest(result.Message);
+                }
+
+                return Ok(new
+                {
+                    message = result.Message,
+                    modificationRequestId = result.ModificationRequestId,
+                    success = true
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error requesting modification for booking {id}");
+                return StatusCode(500, "An error occurred while requesting the modification");
+            }
+        }
+
+        /// <summary>
+        /// Get all pending modification requests (Admin only)
+        /// </summary>
+        /// <returns>List of pending modification requests</returns>
+        [HttpGet("modification-requests")]
+        [ProducesResponseType(typeof(List<ModificationRequestResponseDto>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetPendingModificationRequests()
+        {
+            try
+            {
+                var requests = await _bookingService.GetPendingModificationRequestsAsync();
+                return Ok(requests);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving pending modification requests");
+                return StatusCode(500, "An error occurred while retrieving modification requests");
+            }
+        }
+
+        /// <summary>
+        /// Admin approves or rejects a modification request
+        /// </summary>
+        /// <param name="requestId">Modification request ID</param>
+        /// <param name="reviewDto">Review decision and notes</param>
+        /// <returns>Review result</returns>
+        [HttpPost("modification-requests/{requestId}/review")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> ReviewModificationRequest(
+            string requestId,
+            [FromBody] ReviewModificationRequestDto reviewDto)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+
+                var result = await _bookingService.ReviewModificationRequestAsync(requestId, reviewDto);
+
+                if (!result.Success)
+                {
+                    if (result.Message.Contains("not found"))
+                    {
+                        return NotFound(result.Message);
+                    }
+                    return BadRequest(result.Message);
+                }
+
+                return Ok(new
+                {
+                    message = result.Message,
+                    success = true,
+                    approved = reviewDto.IsApproved
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error reviewing modification request {requestId}");
+                return StatusCode(500, "An error occurred while reviewing the modification request");
+            }
+        }
+
+        /// <summary>
+        /// Admin directly updates a booking (no approval needed)
+        /// </summary>
+        /// <param name="id">Booking ID</param>
+        /// <param name="updateDto">Update details</param>
+        /// <returns>Updated booking</returns>
+        [HttpPut("{id}/admin-update")]
+        [ProducesResponseType(typeof(BookingResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> AdminUpdateBooking(
+            string id,
+            [FromBody] AdminUpdateBookingDto updateDto)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+
+                var result = await _bookingService.AdminUpdateBookingAsync(id, updateDto);
+
+                if (!result.Success)
+                {
+                    if (result.Message.Contains("not found"))
+                    {
+                        return NotFound(result.Message);
+                    }
+                    return BadRequest(result.Message);
+                }
+
+                var bookingResponse = await MapToBookingResponseDtoWithDetailsAsync(result.Booking!);
+                return Ok(bookingResponse);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error in admin update for booking {id}");
+                return StatusCode(500, "An error occurred while updating the booking");
+            }
+        }
+
+        /// <summary>
+        /// Admin deletes a booking with notification
+        /// </summary>
+        /// <param name="id">Booking ID</param>
+        /// <param name="deleteDto">Deletion details</param>
+        /// <returns>Deletion result</returns>
+        [HttpDelete("{id}/admin-delete")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> AdminDeleteBooking(
+            string id,
+            [FromBody] AdminDeleteBookingDto deleteDto)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+
+                var result = await _bookingService.AdminDeleteBookingAsync(id, deleteDto);
+
+                if (!result.Success)
+                {
+                    if (result.Message.Contains("not found"))
+                    {
+                        return NotFound(result.Message);
+                    }
+                    return BadRequest(result.Message);
+                }
+
+                return Ok(new
+                {
+                    message = result.Message,
+                    success = true,
+                    customerNotified = deleteDto.NotifyCustomer
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error in admin delete for booking {id}");
+                return StatusCode(500, "An error occurred while deleting the booking");
+            }
+        }
+
+        #endregion
+
         /// <summary>
         /// Check time slot availability
         /// </summary>

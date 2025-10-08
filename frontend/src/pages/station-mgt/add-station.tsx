@@ -28,6 +28,7 @@ type StationForm = {
   powerRatingKW: number;
   pricePerKWh: string;
   totalSlots: string;
+  maxBookingDurationMinutes: string;
   amenities: string;
   operatingHours: string;
   contactNumber: string;
@@ -44,6 +45,7 @@ export default function AddStationPage() {
     powerRatingKW: 0,
     pricePerKWh: '',
     totalSlots: '',
+    maxBookingDurationMinutes: '240',
     amenities: '',
     operatingHours: '24/7',
     contactNumber: '',
@@ -152,7 +154,8 @@ export default function AddStationPage() {
         longitude: parseFloat(form.longitude),
         connectorType: form.connectorType,
         powerRatingKW: form.powerRatingKW,
-        totalSlots: parseInt(form.totalSlots)
+        totalSlots: parseInt(form.totalSlots),
+        maxBookingDurationMinutes: parseInt(form.maxBookingDurationMinutes)
       }
       // Dynamically import stationsApi to avoid circular import issues
       const { stationsApi } = await import('../../services/stations')
@@ -366,6 +369,22 @@ export default function AddStationPage() {
                       required
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Max Booking Duration (minutes) *</label>
+                  <input
+                    type="number"
+                    name="maxBookingDurationMinutes"
+                    value={form.maxBookingDurationMinutes}
+                    onChange={handleChange}
+                    placeholder="e.g., 240"
+                    min="1"
+                    max="1440"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Maximum duration per booking (1-1440 minutes). Default is 240 minutes (4 hours).</p>
                 </div>
 
                 <div>

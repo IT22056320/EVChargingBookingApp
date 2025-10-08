@@ -946,6 +946,15 @@ namespace WebApplication1.Services
             DateTime startTime,
             DateTime endTime)
         {
+            return await CheckSlotAvailabilityAsync(chargingStationId, startTime, endTime, null);
+        }
+
+        private async Task<(bool Available, int AvailableSlots)> CheckSlotAvailabilityAsync(
+            string chargingStationId,
+            DateTime startTime,
+            DateTime endTime,
+            string? excludeBookingId)
+        {
             try
             {
                 // Get the charging station
@@ -959,20 +968,26 @@ namespace WebApplication1.Services
                     return (false, 0);
                 }
 
+                // Build filter for overlapping bookings
+                var filterBuilder = Builders<Booking>.Filter;
+                var filters = new List<FilterDefinition<Booking>>
+                {
+                    filterBuilder.Eq(b => b.ChargingStationId, chargingStationId),
+                    filterBuilder.In(b => b.Status, new[] { BookingStatus.Pending, BookingStatus.Approved }),
+                    filterBuilder.Lt(b => b.StartTime, endTime),
+                    filterBuilder.Gt(b => b.EndTime, startTime)
+                };
+
+                // Exclude specific booking if provided (for modification scenarios)
+                if (!string.IsNullOrEmpty(excludeBookingId))
+                {
+                    filters.Add(filterBuilder.Ne(b => b.Id, excludeBookingId));
+                }
+
+                var overlappingBookingsFilter = filterBuilder.And(filters);
+                
                 // Get all active bookings (not cancelled or completed) that overlap with the requested time
-                // Only Pending and Approved bookings occupy slots
-                var overlappingBookingsFilter = Builders<Booking>.Filter.And(
-                    Builders<Booking>.Filter.Eq(b => b.ChargingStationId, chargingStationId),
-                    Builders<Booking>.Filter.In(b => b.Status, new[] {
-                        BookingStatus.Pending,
-                        BookingStatus.Approved
-                    }),
-                    // Time overlap logic: booking overlaps if it starts before our end time AND ends after our start time
-                    Builders<Booking>.Filter.And(
-                        Builders<Booking>.Filter.Lt(b => b.StartTime, endTime),
-                        Builders<Booking>.Filter.Gt(b => b.EndTime, startTime)
-                    )
-                );
+                // Only Pending and Approved bookings occupy slots);
 
                 var overlappingBookings = await _mongoDBService.Bookings
                     .Find(overlappingBookingsFilter)
@@ -1204,6 +1219,625 @@ namespace WebApplication1.Services
                 IsActive = booking.IsActive,
                 DurationMinutes = booking.DurationMinutes
             };
+        }
+
+        #endregion
+
+        #region Booking Modification Methods
+
+        /// <summary>
+        /// Customer requests a booking modification (requires admin approval)
+        /// </summary>
+        public async Task<(bool Success, string Message, string? ModificationRequestId)> RequestBookingModificationAsync(
+            string bookingId, 
+            RequestBookingModificationDto modificationDto, 
+            string requestedBy)
+        {
+            try
+            {
+                var booking = await GetBookingByIdAsync(bookingId);
+                if (booking == null)
+                {
+                    return (false, "Booking not found", null);
+                }
+
+                // Validate booking can be modified
+                if (!booking.CanBeModified)
+                {
+                    return (false, "This booking cannot be modified. Must be Pending status and at least 12 hours before start time.", null);
+                }
+
+                // Check if there's already a pending modification request
+                if (booking.HasPendingModification)
+                {
+                    return (false, "There is already a pending modification request for this booking.", null);
+                }
+
+                // Validate requested changes
+                if (modificationDto.StartTime.HasValue && modificationDto.EndTime.HasValue)
+                {
+                    if (modificationDto.EndTime.Value <= modificationDto.StartTime.Value)
+                    {
+                        return (false, "End time must be after start time.", null);
+                    }
+
+                    var duration = (modificationDto.EndTime.Value - modificationDto.StartTime.Value).TotalMinutes;
+                    if (duration > 1440) // 24 hours
+                    {
+                        return (false, "Booking duration cannot exceed 24 hours.", null);
+                    }
+
+                    // Check 7-day booking window
+                    if (modificationDto.BookingDate.HasValue)
+                    {
+                        var daysDifference = (modificationDto.BookingDate.Value.Date - DateTime.UtcNow.Date).TotalDays;
+                        if (daysDifference < 0 || daysDifference > 7)
+                        {
+                            return (false, "Bookings must be made within a 7-day window.", null);
+                        }
+                    }
+                }
+
+                // If station is being changed, verify slot availability
+                if (!string.IsNullOrEmpty(modificationDto.ChargingStationId) && 
+                    modificationDto.ChargingStationId != booking.ChargingStationId &&
+                    modificationDto.StartTime.HasValue && 
+                    modificationDto.EndTime.HasValue)
+                {
+                    var (slotsAvailable, _) = await CheckSlotAvailabilityAsync(
+                        modificationDto.ChargingStationId,
+                        modificationDto.StartTime.Value,
+                        modificationDto.EndTime.Value,
+                        bookingId // Exclude current booking
+                    );
+
+                    if (!slotsAvailable)
+                    {
+                        return (false, "No available slots at the requested station for the selected time.", null);
+                    }
+
+                    // Check for conflicts
+                    var hasConflict = await HasBookingConflictAsync(
+                        modificationDto.ChargingStationId,
+                        modificationDto.StartTime.Value,
+                        modificationDto.EndTime.Value,
+                        bookingId
+                    );
+
+                    if (hasConflict)
+                    {
+                        return (false, "The requested time slot conflicts with an existing booking.", null);
+                    }
+                }
+
+                // Create modification request
+                var modificationRequest = new BookingModificationRequest
+                {
+                    BookingId = bookingId,
+                    RequestedBy = requestedBy,
+                    RequestedAt = DateTime.UtcNow,
+                    Status = ModificationRequestStatus.Pending,
+
+                    // Original values
+                    OriginalChargingStationId = booking.ChargingStationId,
+                    OriginalStartTime = booking.StartTime,
+                    OriginalEndTime = booking.EndTime,
+                    OriginalVehicleNumber = booking.VehicleNumber,
+
+                    // Requested values
+                    RequestedChargingStationId = modificationDto.ChargingStationId,
+                    RequestedBookingDate = modificationDto.BookingDate,
+                    RequestedStartTime = modificationDto.StartTime,
+                    RequestedEndTime = modificationDto.EndTime,
+                    RequestedVehicleNumber = modificationDto.VehicleNumber,
+                    RequestedVehicleType = modificationDto.VehicleType,
+                    RequestedNotes = modificationDto.Notes,
+                    RequestReason = modificationDto.RequestReason
+                };
+
+                await _mongoDBService.ModificationRequests.InsertOneAsync(modificationRequest);
+
+                // Update booking to mark pending modification
+                var updateDefinition = Builders<Booking>.Update
+                    .Set(b => b.HasPendingModification, true)
+                    .Set(b => b.ModificationRequestId, modificationRequest.Id)
+                    .Set(b => b.ModificationRequestedAt, DateTime.UtcNow)
+                    .Set(b => b.ModificationRequestedBy, requestedBy);
+
+                await _mongoDBService.Bookings.UpdateOneAsync(
+                    b => b.Id == bookingId,
+                    updateDefinition
+                );
+
+                // Send notification to admins
+                await _notificationService.SendModificationRequestedAsync(bookingId, modificationRequest.Id!, requestedBy);
+
+                _logger.LogInformation($"Modification request created for booking {bookingId}");
+                return (true, "Modification request submitted successfully. Awaiting admin approval.", modificationRequest.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error requesting modification for booking {bookingId}");
+                return (false, "An error occurred while submitting the modification request.", null);
+            }
+        }
+
+        /// <summary>
+        /// Admin approves or rejects a modification request
+        /// </summary>
+        public async Task<(bool Success, string Message)> ReviewModificationRequestAsync(
+            string modificationRequestId,
+            ReviewModificationRequestDto reviewDto)
+        {
+            try
+            {
+                var modRequest = await _mongoDBService.ModificationRequests
+                    .Find(mr => mr.Id == modificationRequestId)
+                    .FirstOrDefaultAsync();
+
+                if (modRequest == null)
+                {
+                    return (false, "Modification request not found");
+                }
+
+                if (!modRequest.CanBeProcessed)
+                {
+                    return (false, $"Modification request cannot be processed. Current status: {modRequest.Status}");
+                }
+
+                var booking = await GetBookingByIdAsync(modRequest.BookingId);
+                if (booking == null)
+                {
+                    return (false, "Associated booking not found");
+                }
+
+                if (reviewDto.IsApproved)
+                {
+                    // Re-validate before applying changes
+                    if (modRequest.RequestedStartTime.HasValue && modRequest.RequestedEndTime.HasValue)
+                    {
+                        var targetStationId = modRequest.RequestedChargingStationId ?? booking.ChargingStationId;
+                        
+                        var (slotsAvailable, _) = await CheckSlotAvailabilityAsync(
+                            targetStationId,
+                            modRequest.RequestedStartTime.Value,
+                            modRequest.RequestedEndTime.Value,
+                            booking.Id
+                        );
+
+                        if (!slotsAvailable)
+                        {
+                            return (false, "Requested time slot is no longer available.");
+                        }
+
+                        var hasConflict = await HasBookingConflictAsync(
+                            targetStationId,
+                            modRequest.RequestedStartTime.Value,
+                            modRequest.RequestedEndTime.Value,
+                            booking.Id
+                        );
+
+                        if (hasConflict)
+                        {
+                            return (false, "Requested time slot now has a conflict.");
+                        }
+                    }
+
+                    // Apply modifications to booking
+                    var updateBuilder = Builders<Booking>.Update
+                        .Set(b => b.HasPendingModification, false)
+                        .Set(b => b.ModificationRequestId, null)
+                        .Set(b => b.ModifiedAt, DateTime.UtcNow)
+                        .Set(b => b.LastModifiedBy, reviewDto.ReviewedBy);
+
+                    if (!string.IsNullOrEmpty(modRequest.RequestedChargingStationId))
+                    {
+                        updateBuilder = updateBuilder.Set(b => b.ChargingStationId, modRequest.RequestedChargingStationId);
+                    }
+
+                    if (modRequest.RequestedBookingDate.HasValue)
+                    {
+                        updateBuilder = updateBuilder.Set(b => b.BookingDate, modRequest.RequestedBookingDate.Value);
+                    }
+
+                    if (modRequest.RequestedStartTime.HasValue)
+                    {
+                        updateBuilder = updateBuilder.Set(b => b.StartTime, modRequest.RequestedStartTime.Value);
+                    }
+
+                    if (modRequest.RequestedEndTime.HasValue)
+                    {
+                        updateBuilder = updateBuilder.Set(b => b.EndTime, modRequest.RequestedEndTime.Value);
+                    }
+
+                    if (!string.IsNullOrEmpty(modRequest.RequestedVehicleNumber))
+                    {
+                        updateBuilder = updateBuilder.Set(b => b.VehicleNumber, modRequest.RequestedVehicleNumber);
+                    }
+
+                    if (!string.IsNullOrEmpty(modRequest.RequestedVehicleType))
+                    {
+                        updateBuilder = updateBuilder.Set(b => b.VehicleType, modRequest.RequestedVehicleType);
+                    }
+
+                    if (!string.IsNullOrEmpty(modRequest.RequestedNotes))
+                    {
+                        updateBuilder = updateBuilder.Set(b => b.Notes, modRequest.RequestedNotes);
+                    }
+
+                    // Add to modification history
+                    var historyEntry = new BookingModificationHistory
+                    {
+                        ModifiedAt = DateTime.UtcNow,
+                        ModifiedBy = reviewDto.ReviewedBy,
+                        ChangeType = "ModificationApproved",
+                        ChangeDescription = $"Modification request approved: {modRequest.ChangesSummary}",
+                        Changes = new Dictionary<string, string>
+                        {
+                            { "Reason", modRequest.RequestReason },
+                            { "ReviewNotes", reviewDto.ReviewNotes }
+                        }
+                    };
+
+                    updateBuilder = updateBuilder.Push(b => b.ModificationHistory, historyEntry);
+
+                    await _mongoDBService.Bookings.UpdateOneAsync(
+                        b => b.Id == modRequest.BookingId,
+                        updateBuilder
+                    );
+
+                    // Update modification request
+                    var mrUpdate = Builders<BookingModificationRequest>.Update
+                        .Set(mr => mr.Status, ModificationRequestStatus.Approved)
+                        .Set(mr => mr.ReviewedBy, reviewDto.ReviewedBy)
+                        .Set(mr => mr.ReviewedAt, DateTime.UtcNow)
+                        .Set(mr => mr.ReviewNotes, reviewDto.ReviewNotes);
+
+                    await _mongoDBService.ModificationRequests.UpdateOneAsync(
+                        mr => mr.Id == modificationRequestId,
+                        mrUpdate
+                    );
+
+                    // Send notification to customer
+                    await _notificationService.SendModificationApprovedAsync(modRequest.BookingId, modRequest.RequestedBy);
+
+                    _logger.LogInformation($"Modification request {modificationRequestId} approved for booking {modRequest.BookingId}");
+                    return (true, "Modification request approved and applied successfully.");
+                }
+                else
+                {
+                    // Reject the modification
+                    var updateDefinition = Builders<Booking>.Update
+                        .Set(b => b.HasPendingModification, false)
+                        .Set(b => b.ModificationRequestId, null);
+
+                    await _mongoDBService.Bookings.UpdateOneAsync(
+                        b => b.Id == modRequest.BookingId,
+                        updateDefinition
+                    );
+
+                    var mrUpdate = Builders<BookingModificationRequest>.Update
+                        .Set(mr => mr.Status, ModificationRequestStatus.Rejected)
+                        .Set(mr => mr.ReviewedBy, reviewDto.ReviewedBy)
+                        .Set(mr => mr.ReviewedAt, DateTime.UtcNow)
+                        .Set(mr => mr.ReviewNotes, reviewDto.ReviewNotes)
+                        .Set(mr => mr.RejectionReason, reviewDto.RejectionReason);
+
+                    await _mongoDBService.ModificationRequests.UpdateOneAsync(
+                        mr => mr.Id == modificationRequestId,
+                        mrUpdate
+                    );
+
+                    // Send notification to customer
+                    await _notificationService.SendModificationRejectedAsync(modRequest.BookingId, modRequest.RequestedBy, reviewDto.RejectionReason);
+
+                    _logger.LogInformation($"Modification request {modificationRequestId} rejected for booking {modRequest.BookingId}");
+                    return (true, "Modification request rejected.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error reviewing modification request {modificationRequestId}");
+                return (false, "An error occurred while reviewing the modification request.");
+            }
+        }
+
+        /// <summary>
+        /// Admin directly updates booking (no approval needed)
+        /// </summary>
+        public async Task<(bool Success, string Message, Booking? Booking)> AdminUpdateBookingAsync(
+            string bookingId,
+            AdminUpdateBookingDto updateDto)
+        {
+            try
+            {
+                var booking = await GetBookingByIdAsync(bookingId);
+                if (booking == null)
+                {
+                    return (false, "Booking not found", null);
+                }
+
+                // Validate booking status - only allow updates for Pending and Approved bookings
+                if (booking.Status == BookingStatus.Completed || booking.Status == BookingStatus.Cancelled)
+                {
+                    return (false, $"Cannot update {booking.Status.ToString().ToLower()} bookings.", null);
+                }
+
+                // Validate changes with real-time verification
+                if (updateDto.StartTime.HasValue && updateDto.EndTime.HasValue)
+                {
+                    if (updateDto.EndTime.Value <= updateDto.StartTime.Value)
+                    {
+                        return (false, "End time must be after start time.", null);
+                    }
+
+                    var duration = (updateDto.EndTime.Value - updateDto.StartTime.Value).TotalMinutes;
+                    if (duration > 1440)
+                    {
+                        return (false, "Booking duration cannot exceed 24 hours.", null);
+                    }
+
+                    if (updateDto.BookingDate.HasValue)
+                    {
+                        var daysDifference = (updateDto.BookingDate.Value.Date - DateTime.UtcNow.Date).TotalDays;
+                        if (daysDifference < 0 || daysDifference > 7)
+                        {
+                            return (false, "Bookings must be within a 7-day window.", null);
+                        }
+                    }
+
+                    var targetStationId = updateDto.ChargingStationId ?? booking.ChargingStationId;
+
+                    // Check slot availability
+                    var (slotsAvailable, _) = await CheckSlotAvailabilityAsync(
+                        targetStationId,
+                        updateDto.StartTime.Value,
+                        updateDto.EndTime.Value,
+                        bookingId
+                    );
+
+                    if (!slotsAvailable)
+                    {
+                        return (false, "No available slots for the selected time.", null);
+                    }
+
+                    // Check for conflicts
+                    var hasConflict = await HasBookingConflictAsync(
+                        targetStationId,
+                        updateDto.StartTime.Value,
+                        updateDto.EndTime.Value,
+                        bookingId
+                    );
+
+                    if (hasConflict)
+                    {
+                        return (false, "Time slot conflicts with an existing booking.", null);
+                    }
+                }
+
+                // Build update definition
+                var updateBuilder = Builders<Booking>.Update
+                    .Set(b => b.ModifiedAt, DateTime.UtcNow)
+                    .Set(b => b.LastModifiedBy, updateDto.UpdatedBy);
+
+                var changes = new Dictionary<string, string>();
+
+                if (!string.IsNullOrEmpty(updateDto.ChargingStationId) && updateDto.ChargingStationId != booking.ChargingStationId)
+                {
+                    updateBuilder = updateBuilder.Set(b => b.ChargingStationId, updateDto.ChargingStationId);
+                    changes["ChargingStation"] = $"{booking.ChargingStationId} → {updateDto.ChargingStationId}";
+                }
+
+                if (updateDto.BookingDate.HasValue && updateDto.BookingDate != booking.BookingDate)
+                {
+                    updateBuilder = updateBuilder.Set(b => b.BookingDate, updateDto.BookingDate.Value);
+                    changes["BookingDate"] = $"{booking.BookingDate:yyyy-MM-dd} → {updateDto.BookingDate:yyyy-MM-dd}";
+                }
+
+                if (updateDto.StartTime.HasValue && updateDto.StartTime != booking.StartTime)
+                {
+                    updateBuilder = updateBuilder.Set(b => b.StartTime, updateDto.StartTime.Value);
+                    changes["StartTime"] = $"{booking.StartTime:HH:mm} → {updateDto.StartTime:HH:mm}";
+                }
+
+                if (updateDto.EndTime.HasValue && updateDto.EndTime != booking.EndTime)
+                {
+                    updateBuilder = updateBuilder.Set(b => b.EndTime, updateDto.EndTime.Value);
+                    changes["EndTime"] = $"{booking.EndTime:HH:mm} → {updateDto.EndTime:HH:mm}";
+                }
+
+                if (!string.IsNullOrEmpty(updateDto.VehicleNumber) && updateDto.VehicleNumber != booking.VehicleNumber)
+                {
+                    updateBuilder = updateBuilder.Set(b => b.VehicleNumber, updateDto.VehicleNumber);
+                    changes["VehicleNumber"] = $"{booking.VehicleNumber} → {updateDto.VehicleNumber}";
+                }
+
+                if (!string.IsNullOrEmpty(updateDto.VehicleType) && updateDto.VehicleType != booking.VehicleType)
+                {
+                    updateBuilder = updateBuilder.Set(b => b.VehicleType, updateDto.VehicleType);
+                    changes["VehicleType"] = $"{booking.VehicleType} → {updateDto.VehicleType}";
+                }
+
+                if (updateDto.EstimatedChargingTimeMinutes.HasValue && updateDto.EstimatedChargingTimeMinutes != booking.EstimatedChargingTimeMinutes)
+                {
+                    updateBuilder = updateBuilder.Set(b => b.EstimatedChargingTimeMinutes, updateDto.EstimatedChargingTimeMinutes.Value);
+                    changes["EstimatedTime"] = $"{booking.EstimatedChargingTimeMinutes} → {updateDto.EstimatedChargingTimeMinutes}";
+                }
+
+                if (!string.IsNullOrEmpty(updateDto.Notes))
+                {
+                    var adminNote = $"[Admin Update by {updateDto.UpdatedBy}] {updateDto.Notes}";
+                    var updatedNotes = string.IsNullOrWhiteSpace(booking.Notes) 
+                        ? adminNote 
+                        : $"{booking.Notes}\n{adminNote}";
+                    updateBuilder = updateBuilder.Set(b => b.Notes, updatedNotes);
+                }
+
+                // Add to modification history
+                var historyEntry = new BookingModificationHistory
+                {
+                    ModifiedAt = DateTime.UtcNow,
+                    ModifiedBy = updateDto.UpdatedBy,
+                    ChangeType = "AdminUpdate",
+                    ChangeDescription = $"Admin direct update: {updateDto.UpdateReason}",
+                    Changes = changes
+                };
+
+                updateBuilder = updateBuilder.Push(b => b.ModificationHistory, historyEntry);
+
+                await _mongoDBService.Bookings.UpdateOneAsync(
+                    b => b.Id == bookingId,
+                    updateBuilder
+                );
+
+                var updatedBooking = await GetBookingByIdAsync(bookingId);
+
+                // Send notification to customer
+                await _notificationService.SendAdminUpdatedBookingAsync(bookingId, booking.UserId, updateDto.UpdateReason);
+
+                _logger.LogInformation($"Admin {updateDto.UpdatedBy} updated booking {bookingId}");
+                return (true, "Booking updated successfully by admin.", updatedBooking);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error in admin update for booking {bookingId}");
+                return (false, "An error occurred while updating the booking.", null);
+            }
+        }
+
+        /// <summary>
+        /// Admin deletes a booking
+        /// </summary>
+        public async Task<(bool Success, string Message)> AdminDeleteBookingAsync(
+            string bookingId,
+            AdminDeleteBookingDto deleteDto)
+        {
+            try
+            {
+                var booking = await GetBookingByIdAsync(bookingId);
+                if (booking == null)
+                {
+                    return (false, "Booking not found");
+                }
+
+                // Use cancellation for soft delete
+                var updateDefinition = Builders<Booking>.Update
+                    .Set(b => b.Status, BookingStatus.Cancelled)
+                    .Set(b => b.CancelledAt, DateTime.UtcNow)
+                    .Set(b => b.CancelledBy, deleteDto.DeletedBy)
+                    .Set(b => b.CancellationReason, $"[ADMIN DELETED] {deleteDto.DeletionReason}")
+                    .Set(b => b.ModifiedAt, DateTime.UtcNow)
+                    .Set(b => b.QRCode, string.Empty); // Clear QR code
+
+                await _mongoDBService.Bookings.UpdateOneAsync(
+                    b => b.Id == bookingId,
+                    updateDefinition
+                );
+
+                if (deleteDto.NotifyCustomer)
+                {
+                    await _notificationService.SendAdminDeletedBookingAsync(bookingId, booking.UserId, deleteDto.DeletionReason);
+                }
+
+                _logger.LogInformation($"Admin {deleteDto.DeletedBy} deleted booking {bookingId}");
+                return (true, "Booking deleted successfully.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error deleting booking {bookingId}");
+                return (false, "An error occurred while deleting the booking.");
+            }
+        }
+
+        /// <summary>
+        /// Get all pending modification requests
+        /// </summary>
+        public async Task<List<ModificationRequestResponseDto>> GetPendingModificationRequestsAsync()
+        {
+            try
+            {
+                var pendingRequests = await _mongoDBService.ModificationRequests
+                    .Find(mr => mr.Status == ModificationRequestStatus.Pending)
+                    .SortByDescending(mr => mr.RequestedAt)
+                    .ToListAsync();
+
+                var responseDtos = new List<ModificationRequestResponseDto>();
+
+                foreach (var request in pendingRequests)
+                {
+                    var booking = await GetBookingByIdAsync(request.BookingId);
+                    var user = booking != null ? await _mongoDBService.EVOwners.Find(u => u.Id == booking.UserId).FirstOrDefaultAsync() : null;
+
+                    var dto = new ModificationRequestResponseDto
+                    {
+                        Id = request.Id ?? "",
+                        BookingId = request.BookingId,
+                        RequestedBy = request.RequestedBy,
+                        RequestedAt = request.RequestedAt,
+                        Status = request.Status.ToString(),
+
+                        OriginalChargingStationId = request.OriginalChargingStationId,
+                        OriginalStartTime = request.OriginalStartTime,
+                        OriginalEndTime = request.OriginalEndTime,
+                        OriginalVehicleNumber = request.OriginalVehicleNumber,
+
+                        RequestedChargingStationId = request.RequestedChargingStationId,
+                        RequestedBookingDate = request.RequestedBookingDate,
+                        RequestedStartTime = request.RequestedStartTime,
+                        RequestedEndTime = request.RequestedEndTime,
+                        RequestedVehicleNumber = request.RequestedVehicleNumber,
+                        RequestedVehicleType = request.RequestedVehicleType,
+                        RequestedNotes = request.RequestedNotes,
+                        RequestReason = request.RequestReason,
+
+                        ReviewedBy = request.ReviewedBy,
+                        ReviewedAt = request.ReviewedAt,
+                        ReviewNotes = request.ReviewNotes,
+                        RejectionReason = request.RejectionReason,
+
+                        BookingNumber = booking?.BookingNumber ?? "",
+                        ChangesSummary = request.ChangesSummary
+                    };
+
+                    if (user != null)
+                    {
+                        dto.Customer = new UserResponseDto
+                        {
+                            Id = user.Id ?? "",
+                            NIC = user.NIC,
+                            FullName = user.FullName,
+                            Email = user.Email,
+                            PhoneNumber = user.PhoneNumber
+                        };
+                    }
+
+                    // Get station names
+                    if (!string.IsNullOrEmpty(request.OriginalChargingStationId))
+                    {
+                        var originalStation = await _mongoDBService.ChargingStations
+                            .Find(cs => cs.Id == request.OriginalChargingStationId)
+                            .FirstOrDefaultAsync();
+                        dto.OriginalStationName = originalStation?.StationName;
+                    }
+
+                    if (!string.IsNullOrEmpty(request.RequestedChargingStationId))
+                    {
+                        var requestedStation = await _mongoDBService.ChargingStations
+                            .Find(cs => cs.Id == request.RequestedChargingStationId)
+                            .FirstOrDefaultAsync();
+                        dto.RequestedStationName = requestedStation?.StationName;
+                    }
+
+                    responseDtos.Add(dto);
+                }
+
+                return responseDtos;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving pending modification requests");
+                return new List<ModificationRequestResponseDto>();
+            }
         }
 
         #endregion

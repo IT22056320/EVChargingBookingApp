@@ -23,6 +23,7 @@ export default function EditStationPage() {
     connectorType: 'Type2',
     powerRatingKW: 0,
     totalSlots: '',
+    maxBookingDurationMinutes: '240',
     operatingHours: '24/7',
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -47,6 +48,7 @@ export default function EditStationPage() {
         connectorType: data.connectorType,
         powerRatingKW: data.powerRatingKW,
         totalSlots: data.totalSlots.toString(),
+        maxBookingDurationMinutes: (data as any).maxBookingDurationMinutes?.toString() || '240',
         operatingHours: (data as any).operatingHours || '24/7',
       })
     }
@@ -123,7 +125,8 @@ export default function EditStationPage() {
         longitude: parseFloat(form.longitude),
         connectorType: form.connectorType,
         powerRatingKW: form.powerRatingKW,
-        totalSlots: parseInt(form.totalSlots)
+        totalSlots: parseInt(form.totalSlots),
+        maxBookingDurationMinutes: parseInt(form.maxBookingDurationMinutes)
       }
   const { stationsApi } = await import('../../services/stations')
   await stationsApi.updateStation(id as string, payload)
@@ -273,6 +276,21 @@ export default function EditStationPage() {
                       required
                     />
                   </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Max Booking Duration (minutes) *</label>
+                  <input
+                    type="number"
+                    name="maxBookingDurationMinutes"
+                    value={form.maxBookingDurationMinutes}
+                    onChange={handleChange}
+                    placeholder="e.g., 240"
+                    min="1"
+                    max="1440"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Maximum duration per booking (1-1440 minutes). Default is 240 minutes (4 hours).</p>
                 </div>
               </div>
             </div>

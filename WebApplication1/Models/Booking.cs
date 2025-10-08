@@ -26,6 +26,18 @@ namespace WebApplication1.Models
     }
 
     /// <summary>
+    /// Booking modification history entry
+    /// </summary>
+    public class BookingModificationHistory
+    {
+        public DateTime ModifiedAt { get; set; }
+        public string ModifiedBy { get; set; } = string.Empty;
+        public string ChangeType { get; set; } = string.Empty; // "AdminUpdate", "ModificationApproved", etc.
+        public string ChangeDescription { get; set; } = string.Empty;
+        public Dictionary<string, string> Changes { get; set; } = new Dictionary<string, string>();
+    }
+
+    /// <summary>
     /// EV Charging Station Booking model
     /// </summary>
     [BsonIgnoreExtraElements]
@@ -140,6 +152,26 @@ namespace WebApplication1.Models
 
         [BsonElement("energyConsumed")]
         public decimal? EnergyConsumedKWh { get; set; }
+
+        [BsonElement("hasPendingModification")]
+        public bool HasPendingModification { get; set; } = false;
+
+        [BsonElement("modificationRequestId")]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public string? ModificationRequestId { get; set; }
+
+        [BsonElement("modificationRequestedAt")]
+        [BsonDateTimeOptions(Kind = DateTimeKind.Utc)]
+        public DateTime? ModificationRequestedAt { get; set; }
+
+        [BsonElement("modificationRequestedBy")]
+        public string ModificationRequestedBy { get; set; } = string.Empty;
+
+        [BsonElement("lastModifiedBy")]
+        public string LastModifiedBy { get; set; } = string.Empty;
+
+        [BsonElement("modificationHistory")]
+        public List<BookingModificationHistory> ModificationHistory { get; set; } = new List<BookingModificationHistory>();
 
         /// <summary>
         /// Navigation properties (not stored in MongoDB)
