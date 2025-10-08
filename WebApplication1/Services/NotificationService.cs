@@ -17,6 +17,13 @@ namespace WebApplication1.Services
         Task SendStationBookingNotificationAsync(string stationId, BookingResponseDto booking, string action);
         Task SendQRCodeGeneratedAsync(string bookingId, string userId);
         Task SendBulkStatusUpdateAsync(List<string> bookingIds, BookingStatus newStatus);
+        
+        // Modification request notifications
+        Task SendModificationRequestedAsync(string bookingId, string modificationRequestId, string userId);
+        Task SendModificationApprovedAsync(string bookingId, string userId);
+        Task SendModificationRejectedAsync(string bookingId, string userId, string rejectionReason);
+        Task SendAdminUpdatedBookingAsync(string bookingId, string userId, string updateReason);
+        Task SendAdminDeletedBookingAsync(string bookingId, string userId, string deletionReason);
     }
 
     public class NotificationService : INotificationService
@@ -267,6 +274,166 @@ namespace WebApplication1.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Failed to send bulk status update notification for {bookingIds.Count} bookings");
+            }
+        }
+
+        /// <summary>
+        /// Send modification request notification to admins
+        /// </summary>
+        public async Task SendModificationRequestedAsync(string bookingId, string modificationRequestId, string userId)
+        {
+            try
+            {
+                var notification = new
+                {
+                    BookingId = bookingId,
+                    ModificationRequestId = modificationRequestId,
+                    UserId = userId,
+                    Message = "Customer has requested a booking modification",
+                    Timestamp = DateTime.UtcNow,
+                    Type = "ModificationRequested"
+                };
+
+                // Send to backoffice group only
+                await _hubContext.Clients.Group("Backoffice")
+                    .SendAsync("ModificationRequested", notification);
+
+                _logger.LogInformation($"Sent modification request notification for booking {bookingId}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Failed to send modification requested notification for booking {bookingId}");
+            }
+        }
+
+        /// <summary>
+        /// Send modification approved notification to customer
+        /// </summary>
+        public async Task SendModificationApprovedAsync(string bookingId, string userId)
+        {
+            try
+            {
+                var notification = new
+                {
+                    BookingId = bookingId,
+                    UserId = userId,
+                    Message = "Your booking modification request has been approved",
+                    Timestamp = DateTime.UtcNow,
+                    Type = "ModificationApproved"
+                };
+
+                // Send to specific booking group
+                await _hubContext.Clients.Group($"Booking_{bookingId}")
+                    .SendAsync("ModificationApproved", notification);
+
+                // Send to user if connected
+                await _hubContext.Clients.User(userId)
+                    .SendAsync("ModificationApproved", notification);
+
+                _logger.LogInformation($"Sent modification approved notification for booking {bookingId} to user {userId}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Failed to send modification approved notification for booking {bookingId}");
+            }
+        }
+
+        /// <summary>
+        /// Send modification rejected notification to customer
+        /// </summary>
+        public async Task SendModificationRejectedAsync(string bookingId, string userId, string rejectionReason)
+        {
+            try
+            {
+                var notification = new
+                {
+                    BookingId = bookingId,
+                    UserId = userId,
+                    RejectionReason = rejectionReason,
+                    Message = $"Your booking modification request has been rejected: {rejectionReason}",
+                    Timestamp = DateTime.UtcNow,
+                    Type = "ModificationRejected"
+                };
+
+                // Send to specific booking group
+                await _hubContext.Clients.Group($"Booking_{bookingId}")
+                    .SendAsync("ModificationRejected", notification);
+
+                // Send to user if connected
+                await _hubContext.Clients.User(userId)
+                    .SendAsync("ModificationRejected", notification);
+
+                _logger.LogInformation($"Sent modification rejected notification for booking {bookingId} to user {userId}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Failed to send modification rejected notification for booking {bookingId}");
+            }
+        }
+
+        /// <summary>
+        /// Send admin update notification to customer
+        /// </summary>
+        public async Task SendAdminUpdatedBookingAsync(string bookingId, string userId, string updateReason)
+        {
+            try
+            {
+                var notification = new
+                {
+                    BookingId = bookingId,
+                    UserId = userId,
+                    UpdateReason = updateReason,
+                    Message = $"Your booking has been updated by admin: {updateReason}",
+                    Timestamp = DateTime.UtcNow,
+                    Type = "AdminUpdated"
+                };
+
+                // Send to specific booking group
+                await _hubContext.Clients.Group($"Booking_{bookingId}")
+                    .SendAsync("AdminUpdatedBooking", notification);
+
+                // Send to user if connected
+                await _hubContext.Clients.User(userId)
+                    .SendAsync("AdminUpdatedBooking", notification);
+
+                _logger.LogInformation($"Sent admin update notification for booking {bookingId} to user {userId}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Failed to send admin update notification for booking {bookingId}");
+            }
+        }
+
+        /// <summary>
+        /// Send admin deletion notification to customer
+        /// </summary>
+        public async Task SendAdminDeletedBookingAsync(string bookingId, string userId, string deletionReason)
+        {
+            try
+            {
+                var notification = new
+                {
+                    BookingId = bookingId,
+                    UserId = userId,
+                    DeletionReason = deletionReason,
+                    Message = $"Your booking has been cancelled by admin: {deletionReason}",
+                    Timestamp = DateTime.UtcNow,
+                    Type = "AdminDeleted"
+                };
+
+                // Send to specific booking group
+                await _hubContext.Clients.Group($"Booking_{bookingId}")
+                    .SendAsync("AdminDeletedBooking", notification);
+
+                // Send to user if connected
+                await _hubContext.Clients.User(userId)
+                    .SendAsync("AdminDeletedBooking", notification);
+
+                _logger.LogInformation($"Sent admin deletion notification for booking {bookingId} to user {userId}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Failed to send admin deletion notification for booking {bookingId}");
             }
         }
     }

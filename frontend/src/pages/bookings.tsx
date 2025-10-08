@@ -4,6 +4,9 @@ import { useNotifications } from '../providers/notification-provider'
 import { bookingApi, BookingResponse, BookingStatus, BookingStats } from '../services/bookingApi'
 import { UserRole } from '../types'
 import toast from '../utils/toast'
+import { BookingModificationModal } from '../components/BookingModificationModal'
+import { AdminUpdateBookingModal } from '../components/AdminUpdateBookingModal'
+import { ModificationRequests } from '../components/ModificationRequests'
 import { 
   Calendar, 
   Clock, 
@@ -20,7 +23,10 @@ import {
   Eye,
   Check,
   X,
-  Plus
+  Plus,
+  Edit,
+  FileEdit,
+  Trash2
 } from 'lucide-react'
 
 export function BookingsPage() {
@@ -46,6 +52,9 @@ export function BookingsPage() {
   const [showDetails, setShowDetails] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [modifyingBooking, setModifyingBooking] = useState<BookingResponse | null>(null)
+  const [showModificationModal, setShowModificationModal] = useState(false)
+  const [activeTab, setActiveTab] = useState<'bookings' | 'modifications'>('bookings')
 
   useEffect(() => {
     loadBookings()
@@ -184,6 +193,66 @@ export function BookingsPage() {
     setShowDetails(true)
   }
 
+  const handleModifyBooking = (booking: BookingResponse) => {
+    setModifyingBooking(booking)
+    setShowModificationModal(true)
+  }
+
+  const handleModificationSuccess = async () => {
+    setShowModificationModal(false)
+    setModifyingBooking(null)
+    await loadBookings()
+    await loadBookingStats()
+  }
+
+  const handleDeleteBooking = async (booking: BookingResponse) => {
+    if (!user?.id) {
+      toast.error('User information not available')
+      return
+    }
+
+    // Confirm deletion
+    const confirmed = window.confirm(
+      `Are you sure you want to delete booking #${booking.bookingNumber}?\n\n` +
+      `Customer: ${booking.user?.fullName || 'Unknown'}\n` +
+      `Station: ${booking.chargingStation?.stationName || 'Unknown'}\n` +
+      `Date: ${formatDate(booking.startTime)}\n\n` +
+      `This action cannot be undone and the customer will be notified.`
+    )
+
+    if (!confirmed) return
+
+    const deletionReason = window.prompt(
+      'Please provide a reason for deleting this booking (10-500 characters):'
+    )
+
+    if (!deletionReason) {
+      toast.error('Deletion cancelled - reason is required')
+      return
+    }
+
+    if (deletionReason.length < 10 || deletionReason.length > 500) {
+      toast.error('Reason must be between 10 and 500 characters')
+      return
+    }
+
+    try {
+      await bookingApi.adminDeleteBooking(booking.id, {
+        deletedBy: user.id || user.email,
+        deletionReason: deletionReason,
+        notifyCustomer: true
+      })
+
+      toast.success('Booking deleted successfully. Customer has been notified.')
+      await loadBookings()
+      await loadBookingStats()
+    } catch (error: any) {
+      const errorMsg = error.displayMessage || error.message || 'Failed to delete booking'
+      toast.error(errorMsg)
+      console.error('Delete booking error:', error)
+    }
+  }
+
   const createNewBooking = () => {
     window.location.href = '/create-booking'
   }
@@ -279,35 +348,83 @@ export function BookingsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={createNewBooking}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            New Booking
-          </button>
-          {(['all', 'pending', 'approved', 'completed'] as const).map((filter) => (
-            <button
-              key={filter}
-              onClick={() => setStatusFilter(filter)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                statusFilter === filter 
-                  ? 'bg-blue-100 text-blue-700 border border-blue-200' 
-                  : 'bg-white text-gray-700 border hover:bg-gray-50'
-              }`}
-            >
-              {filter.charAt(0).toUpperCase() + filter.slice(1)}
-              {filter !== 'all' && (
-                <span className="ml-2 px-2 py-0.5 bg-blue-500 text-white text-xs rounded-full">
-                  {filter === 'pending' && stats.pendingBookings}
-                  {filter === 'approved' && stats.approvedBookings}
-                  {filter === 'completed' && stats.completedBookings}
-                </span>
-              )}
-            </button>
-          ))}
+          {activeTab === 'bookings' && (
+            <>
+              <button
+                onClick={createNewBooking}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                New Booking
+              </button>
+              {(['all', 'pending', 'approved', 'completed'] as const).map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => setStatusFilter(filter)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    statusFilter === filter 
+                      ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                      : 'bg-white text-gray-700 border hover:bg-gray-50'
+                  }`}
+                >
+                  {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                  {filter !== 'all' && (
+                    <span className="ml-2 px-2 py-0.5 bg-blue-500 text-white text-xs rounded-full">
+                      {filter === 'pending' && stats.pendingBookings}
+                      {filter === 'approved' && stats.approvedBookings}
+                      {filter === 'completed' && stats.completedBookings}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </>
+          )}
         </div>
       </div>
+
+      {/* Tabs */}
+      {user?.role === UserRole.Backoffice && (
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => setActiveTab('bookings')}
+              className={`${
+                activeTab === 'bookings'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2`}
+            >
+              <Calendar className="h-5 w-5" />
+              All Bookings
+              <span className="ml-2 px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
+                {bookings.length}
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('modifications')}
+              className={`${
+                activeTab === 'modifications'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2`}
+            >
+              <FileEdit className="h-5 w-5" />
+              Modification Requests
+            </button>
+          </nav>
+        </div>
+      )}
+
+      {/* Content based on active tab */}
+      {activeTab === 'modifications' ? (
+        <ModificationRequests 
+          onRequestProcessed={() => {
+            loadBookings()
+            loadBookingStats()
+          }} 
+        />
+      ) : (
+        <>
 
       {/* Statistics Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
@@ -456,40 +573,61 @@ export function BookingsPage() {
                     </td>
                     <td className="p-4">
                       <div className="flex items-center justify-center gap-1">
+                        {/* View Details - Always visible */}
                         <button
                           onClick={() => viewDetails(booking)}
-                          className="p-2 rounded-lg hover:bg-muted transition-colors"
+                          className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
                           title="View Details"
                         >
                           <Eye className="h-4 w-4" />
                         </button>
                         
-                        {booking.status === BookingStatus.Pending && (
+                        {/* Admin Actions */}
+                        {user?.role === UserRole.Backoffice && (
                           <>
-                            <button
-                              onClick={() => handleUpdateStatus(booking, BookingStatus.Approved)}
-                              className="p-2 rounded-lg hover:bg-green-50 text-green-600 transition-colors"
-                              title="Approve Booking"
-                            >
-                              <Check className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => handleUpdateStatus(booking, BookingStatus.Cancelled)}
-                              className="p-2 rounded-lg hover:bg-red-50 text-red-600 transition-colors"
-                              title="Cancel Booking"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
+                            {/* Edit/Update - Show for Pending or Approved */}
+                            {(booking.status === BookingStatus.Pending || booking.status === BookingStatus.Approved) && (
+                              <button
+                                onClick={() => handleModifyBooking(booking)}
+                                className="p-2 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors"
+                                title="Update Booking"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </button>
+                            )}
+                            
+                            {/* Approve - Show for Pending only */}
+                            {booking.status === BookingStatus.Pending && (
+                              <button
+                                onClick={() => handleUpdateStatus(booking, BookingStatus.Approved)}
+                                className="p-2 rounded-lg hover:bg-green-50 text-green-600 transition-colors"
+                                title="Approve Booking"
+                              >
+                                <Check className="h-4 w-4" />
+                              </button>
+                            )}
+                            
+                            {/* Delete - Show for all non-completed statuses */}
+                            {booking.status !== BookingStatus.Completed && (
+                              <button
+                                onClick={() => handleDeleteBooking(booking)}
+                                className="p-2 rounded-lg hover:bg-red-50 text-red-600 transition-colors"
+                                title="Delete Booking"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
                           </>
                         )}
                         
-                        {booking.status === BookingStatus.Approved && (
+                        {/* Customer/Station Operator Actions */}
+                        {user?.role !== UserRole.Backoffice && booking.status === BookingStatus.Pending && (
                           <button
-                            onClick={() => handleUpdateStatus(booking, BookingStatus.Completed)}
+                            onClick={() => handleModifyBooking(booking)}
                             className="p-2 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors"
-                            title="Mark Complete"
+                            title="Request Modification"
                           >
-                            <Battery className="h-4 w-4" />
+                            <Edit className="h-4 w-4" />
                           </button>
                         )}
                       </div>
@@ -663,6 +801,38 @@ export function BookingsPage() {
             </div>
           </div>
         </div>
+      )}
+      </>
+      )}
+
+      {/* Booking Modification Modal */}
+      {modifyingBooking && user && (
+        <>
+          {/* Admin uses direct update modal, customers use modification request modal */}
+          {user.role === UserRole.Backoffice ? (
+            <AdminUpdateBookingModal
+              booking={modifyingBooking}
+              adminId={user.id || user.email}
+              isOpen={showModificationModal}
+              onClose={() => {
+                setShowModificationModal(false)
+                setModifyingBooking(null)
+              }}
+              onSuccess={handleModificationSuccess}
+            />
+          ) : (
+            <BookingModificationModal
+              booking={modifyingBooking}
+              userId={modifyingBooking.userId || user.id || ''}
+              isOpen={showModificationModal}
+              onClose={() => {
+                setShowModificationModal(false)
+                setModifyingBooking(null)
+              }}
+              onSuccess={handleModificationSuccess}
+            />
+          )}
+        </>
       )}
     </div>
   )
