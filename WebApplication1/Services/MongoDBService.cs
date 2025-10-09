@@ -50,6 +50,12 @@ namespace WebApplication1.Services
         public IMongoCollection<ChargingStation> ChargingStations =>
             _database.GetCollection<ChargingStation>("chargingstations");
 
+        /// <summary>
+        /// Collection for Booking Modification Requests
+        /// </summary>
+        public IMongoCollection<BookingModificationRequest> ModificationRequests =>
+            _database.GetCollection<BookingModificationRequest>("modificationrequests");
+
         // Keep the old Users collection for backward compatibility during transition
         public IMongoCollection<User> Users =>
             _database.GetCollection<User>("users");

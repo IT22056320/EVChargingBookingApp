@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
 using WebApplication1.Models;
 using WebApplication1.Services;
+using WebApplication1.DTOs;
 using BCrypt.Net;
 
 namespace WebApplication1.Controllers
@@ -139,6 +140,8 @@ namespace WebApplication1.Controllers
                     Password = BCrypt.Net.BCrypt.HashPassword(request.Password),
                     PhoneNumber = request.PhoneNumber ?? string.Empty,
                     Address = request.Address ?? string.Empty,
+                    Latitude = request.Latitude,
+                    Longitude = request.Longitude,
                     IsActive = true,
                     IsApproved = false, // Requires approval by backoffice
                     RegisteredAt = DateTime.UtcNow
@@ -161,6 +164,44 @@ namespace WebApplication1.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Registration failed", error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Update EV owner profile (from mobile app - phone and address)
+        /// </summary>
+        [HttpPut("{nic}")]
+        public async Task<ActionResult> UpdateProfile(string nic, [FromBody] UpdateEVOwnerProfileRequest request)
+        {
+            try
+            {
+                // Find the EV owner
+                var filter = Builders<User>.Filter.Eq(u => u.NIC, nic);
+                var evOwner = await _mongoDBService.EVOwners.Find(filter).FirstOrDefaultAsync();
+
+                if (evOwner == null)
+                    return NotFound($"EV Owner with NIC {nic} not found");
+
+                // Update profile fields
+                var updateBuilder = Builders<User>.Update
+                    .Set(u => u.PhoneNumber, request.PhoneNumber)
+                    .Set(u => u.Address, request.Address)
+                    .Set(u => u.Latitude, request.Latitude)
+                    .Set(u => u.Longitude, request.Longitude);
+
+                var result = await _mongoDBService.EVOwners.UpdateOneAsync(filter, updateBuilder);
+
+                if (result.MatchedCount == 0)
+                    return NotFound($"Failed to update EV Owner with NIC {nic}");
+
+                // Retrieve updated user
+                var updatedOwner = await _mongoDBService.EVOwners.Find(filter).FirstOrDefaultAsync();
+
+                return Ok(updatedOwner);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Failed to update profile", error = ex.Message });
             }
         }
 
@@ -318,44 +359,5 @@ namespace WebApplication1.Controllers
                 return StatusCode(500, new { message = "Failed to retrieve pending approvals", error = ex.Message });
             }
         }
-    }
-
-    /// <summary>
-    /// EV Owner registration request model
-    /// </summary>
-    public class RegisterEVOwnerRequest
-    {
-        public string NIC { get; set; } = string.Empty;
-        public string FullName { get; set; } = string.Empty;
-        public string Email { get; set; } = string.Empty;
-        public string Password { get; set; } = string.Empty;
-        public string? PhoneNumber { get; set; }
-        public string? Address { get; set; }
-    }
-
-    /// <summary>
-    /// Approval request model
-    /// </summary>
-    public class ApprovalRequest
-    {
-        public bool IsApproved { get; set; }
-        public string? ApprovedBy { get; set; }
-    }
-
-    /// <summary>
-    /// Status update request model
-    /// </summary>
-    public class StatusUpdateRequest
-    {
-        public bool IsActive { get; set; }
-    }
-
-    /// <summary>
-    /// EV Owner login request model - Updated to use email for authentication
-    /// </summary>
-    public class LoginEVOwnerRequest
-    {
-        public string Email { get; set; } = string.Empty;
-        public string Password { get; set; } = string.Empty;
     }
 }

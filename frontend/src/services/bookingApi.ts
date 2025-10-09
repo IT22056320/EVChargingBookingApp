@@ -84,13 +84,13 @@ export interface ChargingStationResponse {
 }
 
 export enum BookingStatus {
-  Pending = 0,
-  Approved = 1,
-  InProgress = 2,
-  Completed = 3,
-  Cancelled = 4,
-  Rejected = 5,
-  NoShow = 6
+  Pending = "Pending",
+  Approved = "Approved",
+  InProgress = "InProgress",
+  Completed = "Completed",
+  Cancelled = "Cancelled",
+  Rejected = "Rejected",
+  NoShow = "NoShow"
 }
 
 export enum ConnectorType {
@@ -193,6 +193,71 @@ export interface ChargingStation {
   description?: string
 }
 
+// Booking Modification Interfaces
+export interface RequestBookingModificationDto {
+  requestedStationId: string
+  requestedStartTime: string // ISO datetime string
+  requestedEndTime: string // ISO datetime string
+  requestedVehicleNumber: string
+  requestReason: string // 10-500 characters
+}
+
+export interface ReviewModificationRequestDto {
+  isApproved: boolean
+  reviewedBy: string
+  reviewNotes?: string
+  rejectionReason?: string // Required if isApproved = false
+}
+
+export interface AdminUpdateBookingDto {
+  updatedBy: string
+  updateReason: string // 10-500 characters
+  stationId?: string
+  startTime?: string // ISO datetime string
+  endTime?: string // ISO datetime string
+  vehicleNumber?: string
+}
+
+export interface AdminDeleteBookingDto {
+  deletedBy: string
+  deletionReason: string // 10-500 characters
+  notifyCustomer?: boolean // Default: true
+}
+
+export interface ModificationRequestResponse {
+  id: string
+  bookingId: string
+  bookingNumber: string
+  requestedBy: string
+  customerName: string
+  customerPhone: string
+  originalStationId: string
+  originalStationName: string
+  requestedStationId: string
+  requestedStationName: string
+  originalStartTime: string
+  requestedStartTime: string
+  originalEndTime: string
+  requestedEndTime: string
+  originalVehicleNumber: string
+  requestedVehicleNumber: string
+  requestReason: string
+  status: ModificationRequestStatus
+  reviewedBy?: string
+  reviewedAt?: string
+  reviewNotes?: string
+  rejectionReason?: string
+  createdAt: string
+  changesSummary: string
+}
+
+export enum ModificationRequestStatus {
+  Pending = "Pending",
+  Approved = "Approved",
+  Rejected = "Rejected",
+  Cancelled = "Cancelled"
+}
+
 class BookingApiService {
   // Create a new booking
   async createBooking(bookingData: CreateBooking): Promise<BookingResponse> {
@@ -277,6 +342,73 @@ class BookingApiService {
   // Get all charging stations (for booking creation)
   async getChargingStations(): Promise<ChargingStation[]> {
     return await apiService.get('/ChargingStations')
+  }
+
+  // ===== Booking Modification Methods =====
+
+  // Request booking modification (Customer)
+  async requestBookingModification(
+    bookingId: string,
+    userId: string,
+    modificationData: RequestBookingModificationDto
+  ): Promise<ModificationRequestResponse> {
+    return await apiService.post<ModificationRequestResponse>(
+      `/Bookings/${bookingId}/request-modification?userId=${userId}`,
+      modificationData
+    )
+  }
+
+  // Get all pending modification requests (Admin)
+  async getPendingModificationRequests(): Promise<ModificationRequestResponse[]> {
+    return await apiService.get<ModificationRequestResponse[]>('/Bookings/modification-requests')
+  }
+
+  // Review modification request - approve or reject (Admin)
+  async reviewModificationRequest(
+    requestId: string,
+    reviewData: ReviewModificationRequestDto
+  ): Promise<ModificationRequestResponse> {
+    return await apiService.post<ModificationRequestResponse>(
+      `/Bookings/modification-requests/${requestId}/review`,
+      reviewData
+    )
+  }
+
+  // Admin direct update booking (Admin)
+  async adminUpdateBooking(
+    bookingId: string,
+    updateData: AdminUpdateBookingDto
+  ): Promise<BookingResponse> {
+    return await apiService.put<BookingResponse>(
+      `/Bookings/${bookingId}/admin-update`,
+      updateData
+    )
+  }
+
+  // Admin delete booking (Admin)
+  async adminDeleteBooking(
+    bookingId: string,
+    deleteData: AdminDeleteBookingDto
+  ): Promise<{ message: string }> {
+    // Use fetch for DELETE with body since axios delete doesn't support body easily
+    const response = await fetch(
+      `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'}/Bookings/${bookingId}/admin-delete`,
+      {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        },
+        body: JSON.stringify(deleteData)
+      }
+    )
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to delete booking')
+    }
+    
+    return await response.json()
   }
 
   // Get status display name

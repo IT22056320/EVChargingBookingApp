@@ -9,6 +9,7 @@
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using System.ComponentModel.DataAnnotations;
+using WebApplication1.Serializers;
 
 namespace WebApplication1.Models
 {
@@ -22,6 +23,18 @@ namespace WebApplication1.Models
         Completed = 2,
         Cancelled = 3,
         Rejected = 4
+    }
+
+    /// <summary>
+    /// Booking modification history entry
+    /// </summary>
+    public class BookingModificationHistory
+    {
+        public DateTime ModifiedAt { get; set; }
+        public string ModifiedBy { get; set; } = string.Empty;
+        public string ChangeType { get; set; } = string.Empty; // "AdminUpdate", "ModificationApproved", etc.
+        public string ChangeDescription { get; set; } = string.Empty;
+        public Dictionary<string, string> Changes { get; set; } = new Dictionary<string, string>();
     }
 
     /// <summary>
@@ -39,7 +52,7 @@ namespace WebApplication1.Models
         public string BookingNumber { get; set; } = string.Empty;
 
         [BsonElement("userId")]
-        [BsonRepresentation(BsonType.ObjectId)]
+        [BsonSerializer(typeof(FlexibleStringSerializer))]
         [Required]
         public string UserId { get; set; } = string.Empty;
 
@@ -140,6 +153,26 @@ namespace WebApplication1.Models
         [BsonElement("energyConsumed")]
         public decimal? EnergyConsumedKWh { get; set; }
 
+        [BsonElement("hasPendingModification")]
+        public bool HasPendingModification { get; set; } = false;
+
+        [BsonElement("modificationRequestId")]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public string? ModificationRequestId { get; set; }
+
+        [BsonElement("modificationRequestedAt")]
+        [BsonDateTimeOptions(Kind = DateTimeKind.Utc)]
+        public DateTime? ModificationRequestedAt { get; set; }
+
+        [BsonElement("modificationRequestedBy")]
+        public string ModificationRequestedBy { get; set; } = string.Empty;
+
+        [BsonElement("lastModifiedBy")]
+        public string LastModifiedBy { get; set; } = string.Empty;
+
+        [BsonElement("modificationHistory")]
+        public List<BookingModificationHistory> ModificationHistory { get; set; } = new List<BookingModificationHistory>();
+
         /// <summary>
         /// Navigation properties (not stored in MongoDB)
         /// </summary>
@@ -159,10 +192,11 @@ namespace WebApplication1.Models
 
         /// <summary>
         /// Business rule: Check if booking can be modified (within 12 hours of start time)
+        /// EV owners can modify both Pending and Approved bookings with sufficient notice
         /// </summary>
         [BsonIgnore]
         public bool CanBeModified => 
-            Status == BookingStatus.Pending && 
+            (Status == BookingStatus.Pending || Status == BookingStatus.Approved) && 
             StartTime.Subtract(DateTime.UtcNow).TotalHours >= 12;
 
         /// <summary>

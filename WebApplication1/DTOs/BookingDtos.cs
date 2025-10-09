@@ -306,4 +306,128 @@ namespace WebApplication1.DTOs
         public BookingStatus Status { get; set; }
         public string UserName { get; set; } = string.Empty;
     }
+
+    /// <summary>
+    /// Customer-initiated booking modification request DTO
+    /// </summary>
+    public class RequestBookingModificationDto
+    {
+        public string? ChargingStationId { get; set; }
+        public DateTime? BookingDate { get; set; }
+        public DateTime? StartTime { get; set; }
+        public DateTime? EndTime { get; set; }
+
+        [StringLength(20, MinimumLength = 2)]
+        public string? VehicleNumber { get; set; }
+        public string? VehicleType { get; set; }
+
+        [StringLength(500)]
+        public string? Notes { get; set; }
+
+        [Required]
+        [StringLength(500, MinimumLength = 10)]
+        public string RequestReason { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Admin approval/rejection of modification request DTO
+    /// </summary>
+    public class ReviewModificationRequestDto
+    {
+        [Required]
+        public bool IsApproved { get; set; }
+
+        [Required]
+        public string ReviewedBy { get; set; } = string.Empty;
+
+        [StringLength(500)]
+        public string ReviewNotes { get; set; } = string.Empty;
+
+        [StringLength(500)]
+        public string RejectionReason { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Admin direct booking update DTO (no approval needed)
+    /// </summary>
+    public class AdminUpdateBookingDto
+    {
+        public string? ChargingStationId { get; set; }
+        public DateTime? BookingDate { get; set; }
+        public DateTime? StartTime { get; set; }
+        public DateTime? EndTime { get; set; }
+
+        [StringLength(20, MinimumLength = 2)]
+        public string? VehicleNumber { get; set; }
+        public string? VehicleType { get; set; }
+
+        [Range(1, 1440)]
+        public int? EstimatedChargingTimeMinutes { get; set; }
+
+        [StringLength(500)]
+        public string? Notes { get; set; }
+
+        [Required]
+        public string UpdatedBy { get; set; } = string.Empty;
+
+        [StringLength(500)]
+        public string UpdateReason { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Admin booking deletion DTO
+    /// </summary>
+    public class AdminDeleteBookingDto
+    {
+        [Required]
+        public string DeletedBy { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(500, MinimumLength = 10)]
+        public string DeletionReason { get; set; } = string.Empty;
+
+        public bool NotifyCustomer { get; set; } = true;
+    }
+
+    /// <summary>
+    /// Booking modification request response DTO
+    /// </summary>
+    public class ModificationRequestResponseDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string BookingId { get; set; } = string.Empty;
+        public string RequestedBy { get; set; } = string.Empty;
+        public DateTime RequestedAt { get; set; }
+        public string Status { get; set; } = string.Empty;
+
+        // Original values
+        public string? OriginalChargingStationId { get; set; }
+        public string? OriginalStationName { get; set; }
+        public DateTime? OriginalStartTime { get; set; }
+        public DateTime? OriginalEndTime { get; set; }
+        public string? OriginalVehicleNumber { get; set; }
+
+        // Requested values
+        public string? RequestedChargingStationId { get; set; }
+        public string? RequestedStationName { get; set; }
+        public DateTime? RequestedBookingDate { get; set; }
+        public DateTime? RequestedStartTime { get; set; }
+        public DateTime? RequestedEndTime { get; set; }
+        public string? RequestedVehicleNumber { get; set; }
+        public string? RequestedVehicleType { get; set; }
+        public string? RequestedNotes { get; set; }
+        public string RequestReason { get; set; } = string.Empty;
+
+        // Review details
+        public string ReviewedBy { get; set; } = string.Empty;
+        public DateTime? ReviewedAt { get; set; }
+        public string ReviewNotes { get; set; } = string.Empty;
+        public string RejectionReason { get; set; } = string.Empty;
+
+        // Related booking info
+        public string BookingNumber { get; set; } = string.Empty;
+        public UserResponseDto? Customer { get; set; }
+
+        public string ChangesSummary { get; set; } = string.Empty;
+    }
 }

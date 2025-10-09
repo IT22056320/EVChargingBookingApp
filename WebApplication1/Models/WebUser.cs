@@ -46,6 +46,12 @@ namespace WebApplication1.Models
 
         [BsonElement("createdBy")]
         public string CreatedBy { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Assigned charging station ID (for Station Operators only)
+        /// </summary>
+        [BsonElement("assignedStationId")]
+        public string? AssignedStationId { get; set; }
     }
 
     /// <summary>

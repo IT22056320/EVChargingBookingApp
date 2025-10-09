@@ -1,8 +1,8 @@
 /*
  * File: ChargingStation.cs
  * Description: Model for EV Charging Stations
- * Author: [Your Team Name]
- * Date: [Current Date]
+ * Author: EV Charging Team
+ * Date: September 30, 2025
  */
 
 using MongoDB.Bson;
@@ -27,11 +27,12 @@ namespace WebApplication1.Models
     /// </summary>
     public enum ConnectorType
     {
-        Type1 = 0,
-        Type2 = 1,
-        CHAdeMO = 2,
-        CCS = 3,
-        Tesla = 4
+        Unknown = 0,
+        Type1 = 1,
+        Type2 = 2,
+        CHAdeMO = 3,
+        CCS = 4,
+        Tesla = 5
     }
 
     /// <summary>
@@ -94,6 +95,13 @@ namespace WebApplication1.Models
         [BsonElement("maxBookingDurationMinutes")]
         public int MaxBookingDurationMinutes { get; set; } = 240; // 4 hours default
 
+        [BsonElement("availableSlots")]
+        [Required]
+        public int AvailableSlots { get; set; } = 0;
+
+        [BsonElement("totalSlots")]
+        public int TotalSlots { get; set; } = 0;
+
         [BsonElement("createdAt")]
         [BsonDateTimeOptions(Kind = DateTimeKind.Utc)]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
@@ -117,14 +125,14 @@ namespace WebApplication1.Models
         public List<Booking>? Bookings { get; set; }
 
         /// <summary>
-        /// Check if station is currently available for booking
+        /// Checks if the station is currently available for booking.
         /// </summary>
         [BsonIgnore]
         public bool IsBookingAvailable => 
             Status == ChargingStationStatus.Active && IsAvailable;
 
         /// <summary>
-        /// Check if station requires maintenance
+        /// Checks if the station requires maintenance.
         /// </summary>
         [BsonIgnore]
         public bool RequiresMaintenance => 

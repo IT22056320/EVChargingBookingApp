@@ -1,8 +1,8 @@
 /*
  * File: ChargingStationsController.cs
  * Description: API Controller for Charging Stations management
- * Author: [Your Team Name]
- * Date: [Current Date]
+ * Author: EV Charging Team
+ * Date: September 30, 2025
  */
 
 using Microsoft.AspNetCore.Mvc;
@@ -17,105 +17,131 @@ namespace WebApplication1.Controllers
     [Route("api/[controller]")]
     public class ChargingStationsController : ControllerBase
     {
-        private readonly MongoDBService _mongoDBService;
-        private readonly ILogger<ChargingStationsController> _logger;
+        private readonly ChargingStationService _stationService;
+        private readonly BookingService _bookingService;
 
-        public ChargingStationsController(MongoDBService mongoDBService, ILogger<ChargingStationsController> logger)
+        // Constructor for ChargingStationsController
+        public ChargingStationsController(
+            ChargingStationService stationService,
+            BookingService bookingService)
         {
-            _mongoDBService = mongoDBService;
-            _logger = logger;
+            _stationService = stationService;
+            _bookingService = bookingService;
         }
 
-        /// <summary>
-        /// Get all active charging stations
-        /// </summary>
+        // Gets all charging stations
         [HttpGet]
-        public async Task<IActionResult> GetChargingStations()
+        public async Task<IActionResult> GetStations()
         {
-            try
-            {
-                var filter = Builders<ChargingStation>.Filter.Eq(cs => cs.Status, ChargingStationStatus.Active);
-                var chargingStations = await _mongoDBService.ChargingStations
-                    .Find(filter)
-                    .ToListAsync();
-
-                var response = chargingStations.Select(cs => new ChargingStationResponseDto
-                {
-                    Id = cs.Id ?? string.Empty,
-                    StationName = cs.StationName,
-                    Location = cs.Location,
-                    Address = cs.Address,
-                    ConnectorType = cs.ConnectorType.ToString(),
-                    PowerRatingKW = cs.PowerRatingKW,
-                    PricePerKWh = cs.PricePerKWh,
-                    Status = cs.Status.ToString(),
-                    Description = cs.Description,
-                    Amenities = cs.Amenities,
-                    OperatingHours = cs.OperatingHours,
-                    IsAvailable = cs.IsAvailable,
-                    MaxBookingDurationMinutes = cs.MaxBookingDurationMinutes,
-                    Coordinates = new CoordinatesDto
-                    {
-                        Latitude = cs.Latitude ?? 0,
-                        Longitude = cs.Longitude ?? 0
-                    }
-                }).ToList();
-
-                return Ok(response);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving charging stations");
-                return StatusCode(500, new { message = "An error occurred while retrieving charging stations." });
-            }
+            var stations = await _stationService.GetAllAsync();
+            return Ok(stations);
         }
 
-        /// <summary>
-        /// Get charging station by ID
-        /// </summary>
+        // Gets a charging station by ID
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetChargingStation(string id)
+        public async Task<IActionResult> GetStation(string id)
+        {
+            var station = await _stationService.GetByIdAsync(id);
+            if (station == null) return NotFound();
+            return Ok(station);
+        }
+
+        // Creates a new charging station
+        [HttpPost]
+        public async Task<IActionResult> CreateStation([FromBody] ChargingStationDto dto)
+        {
+            var result = await _stationService.CreateAsync(dto);
+            if (!result.Success) return BadRequest(result.Message);
+            return CreatedAtAction(nameof(GetStation), new { id = result.Station!.Id }, result.Station);
+        }
+
+        // Updates a charging station
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateStation(string id, [FromBody] ChargingStationDto dto)
+        {
+            // Check if the update is a deactivation
+            if (dto.IsAvailable == false)
+            {
+                // Query for active bookings at this station
+                var hasActiveBookings = await _bookingService.HasActiveBookingsAsync(id);
+                if (hasActiveBookings)
+                {
+                    return BadRequest("Cannot deactivate station: active bookings exist.");
+                }
+            }
+            var result = await _stationService.UpdateAsync(id, dto);
+            if (!result.Success) return BadRequest(result.Message);
+            return Ok(new { message = result.Message });
+        }
+
+        // Deletes (deactivates) a charging station
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteStation(string id)
+        {
+            var result = await _stationService.DeleteAsync(id);
+            if (!result.Success) return BadRequest(result.Message);
+            return Ok(new { message = result.Message });
+        }
+
+        // Gets slot availability for a charging station within a time range
+        [HttpGet("{id}/availability")]
+        public async Task<IActionResult> GetSlotAvailability(
+            string id,
+            [FromQuery] DateTime startTime,
+            [FromQuery] DateTime endTime)
         {
             try
             {
-                var chargingStation = await _mongoDBService.ChargingStations
-                    .Find(cs => cs.Id == id)
-                    .FirstOrDefaultAsync();
-
-                if (chargingStation == null)
+                // Validate time range
+                if (startTime >= endTime)
                 {
-                    return NotFound(new { message = "Charging station not found." });
+                    return BadRequest(new { message = "Start time must be before end time" });
                 }
 
-                var response = new ChargingStationResponseDto
+                if (startTime < DateTime.Now)
                 {
-                    Id = chargingStation.Id ?? string.Empty,
-                    StationName = chargingStation.StationName,
-                    Location = chargingStation.Location,
-                    Address = chargingStation.Address,
-                    ConnectorType = chargingStation.ConnectorType.ToString(),
-                    PowerRatingKW = chargingStation.PowerRatingKW,
-                    PricePerKWh = chargingStation.PricePerKWh,
-                    Status = chargingStation.Status.ToString(),
-                    Description = chargingStation.Description,
-                    Amenities = chargingStation.Amenities,
-                    OperatingHours = chargingStation.OperatingHours,
-                    IsAvailable = chargingStation.IsAvailable,
-                    MaxBookingDurationMinutes = chargingStation.MaxBookingDurationMinutes,
-                    Coordinates = new CoordinatesDto
-                    {
-                        Latitude = chargingStation.Latitude ?? 0,
-                        Longitude = chargingStation.Longitude ?? 0
-                    }
-                };
+                    return BadRequest(new { message = "Start time cannot be in the past" });
+                }
 
-                return Ok(response);
+                // Verify station exists
+                var station = await _stationService.GetByIdAsync(id);
+                if (station == null)
+                {
+                    return NotFound(new { message = "Charging station not found" });
+                }
+
+                if (!station.IsAvailable)
+                {
+                    return Ok(new
+                    {
+                        availableSlots = 0,
+                        totalSlots = station.TotalSlots,
+                        occupiedSlots = station.TotalSlots,
+                        message = "Station is currently unavailable"
+                    });
+                }
+
+                // Get slot availability from booking service
+                var (availableSlots, totalSlots, occupiedSlots) = await _bookingService.GetAvailableSlotsAsync(
+                    id,
+                    startTime,
+                    endTime
+                );
+
+                return Ok(new
+                {
+                    availableSlots,
+                    totalSlots,
+                    occupiedSlots,
+                    startTime,
+                    endTime
+                });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving charging station with ID: {ChargingStationId}", id);
-                return StatusCode(500, new { message = "An error occurred while retrieving the charging station." });
+                return StatusCode(500, new { message = $"Error checking slot availability: {ex.Message}" });
             }
         }
     }
+
 }

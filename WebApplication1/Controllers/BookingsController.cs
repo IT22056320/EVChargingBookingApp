@@ -25,17 +25,20 @@ namespace WebApplication1.Controllers
         private readonly BookingService _bookingService;
         private readonly QRCodeService _qrCodeService;
         private readonly MongoDBService _mongoDBService;
+        private readonly ChargingStationService _chargingStationService;
         private readonly ILogger<BookingsController> _logger;
 
         public BookingsController(
             BookingService bookingService,
             QRCodeService qrCodeService,
             MongoDBService mongoDBService,
+            ChargingStationService chargingStationService,
             ILogger<BookingsController> logger)
         {
             _bookingService = bookingService;
             _qrCodeService = qrCodeService;
             _mongoDBService = mongoDBService;
+            _chargingStationService = chargingStationService;
             _logger = logger;
         }
 
@@ -428,6 +431,217 @@ namespace WebApplication1.Controllers
             }
         }
 
+        #region Booking Modification Endpoints
+
+        /// <summary>
+        /// Customer requests a booking modification (requires admin approval)
+        /// </summary>
+        /// <param name="id">Booking ID</param>
+        /// <param name="modificationDto">Modification request details</param>
+        /// <param name="userId">User ID making the request</param>
+        /// <returns>Modification request status</returns>
+        [HttpPost("{id}/request-modification")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> RequestBookingModification(
+            string id, 
+            [FromBody] RequestBookingModificationDto modificationDto,
+            [FromQuery] [Required] string userId)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return BadRequest("userId parameter is required");
+                }
+
+                var result = await _bookingService.RequestBookingModificationAsync(id, modificationDto, userId);
+
+                if (!result.Success)
+                {
+                    if (result.Message.Contains("not found"))
+                    {
+                        return NotFound(result.Message);
+                    }
+                    return BadRequest(result.Message);
+                }
+
+                return Ok(new
+                {
+                    message = result.Message,
+                    modificationRequestId = result.ModificationRequestId,
+                    success = true
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error requesting modification for booking {id}");
+                return StatusCode(500, "An error occurred while requesting the modification");
+            }
+        }
+
+        /// <summary>
+        /// Get all pending modification requests (Admin only)
+        /// </summary>
+        /// <returns>List of pending modification requests</returns>
+        [HttpGet("modification-requests")]
+        [ProducesResponseType(typeof(List<ModificationRequestResponseDto>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetPendingModificationRequests()
+        {
+            try
+            {
+                var requests = await _bookingService.GetPendingModificationRequestsAsync();
+                return Ok(requests);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving pending modification requests");
+                return StatusCode(500, "An error occurred while retrieving modification requests");
+            }
+        }
+
+        /// <summary>
+        /// Admin approves or rejects a modification request
+        /// </summary>
+        /// <param name="requestId">Modification request ID</param>
+        /// <param name="reviewDto">Review decision and notes</param>
+        /// <returns>Review result</returns>
+        [HttpPost("modification-requests/{requestId}/review")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> ReviewModificationRequest(
+            string requestId,
+            [FromBody] ReviewModificationRequestDto reviewDto)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+
+                var result = await _bookingService.ReviewModificationRequestAsync(requestId, reviewDto);
+
+                if (!result.Success)
+                {
+                    if (result.Message.Contains("not found"))
+                    {
+                        return NotFound(result.Message);
+                    }
+                    return BadRequest(result.Message);
+                }
+
+                return Ok(new
+                {
+                    message = result.Message,
+                    success = true,
+                    approved = reviewDto.IsApproved
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error reviewing modification request {requestId}");
+                return StatusCode(500, "An error occurred while reviewing the modification request");
+            }
+        }
+
+        /// <summary>
+        /// Admin directly updates a booking (no approval needed)
+        /// </summary>
+        /// <param name="id">Booking ID</param>
+        /// <param name="updateDto">Update details</param>
+        /// <returns>Updated booking</returns>
+        [HttpPut("{id}/admin-update")]
+        [ProducesResponseType(typeof(BookingResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> AdminUpdateBooking(
+            string id,
+            [FromBody] AdminUpdateBookingDto updateDto)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+
+                var result = await _bookingService.AdminUpdateBookingAsync(id, updateDto);
+
+                if (!result.Success)
+                {
+                    if (result.Message.Contains("not found"))
+                    {
+                        return NotFound(result.Message);
+                    }
+                    return BadRequest(result.Message);
+                }
+
+                var bookingResponse = await MapToBookingResponseDtoWithDetailsAsync(result.Booking!);
+                return Ok(bookingResponse);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error in admin update for booking {id}");
+                return StatusCode(500, "An error occurred while updating the booking");
+            }
+        }
+
+        /// <summary>
+        /// Admin deletes a booking with notification
+        /// </summary>
+        /// <param name="id">Booking ID</param>
+        /// <param name="deleteDto">Deletion details</param>
+        /// <returns>Deletion result</returns>
+        [HttpDelete("{id}/admin-delete")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> AdminDeleteBooking(
+            string id,
+            [FromBody] AdminDeleteBookingDto deleteDto)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+
+                var result = await _bookingService.AdminDeleteBookingAsync(id, deleteDto);
+
+                if (!result.Success)
+                {
+                    if (result.Message.Contains("not found"))
+                    {
+                        return NotFound(result.Message);
+                    }
+                    return BadRequest(result.Message);
+                }
+
+                return Ok(new
+                {
+                    message = result.Message,
+                    success = true,
+                    customerNotified = deleteDto.NotifyCustomer
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error in admin delete for booking {id}");
+                return StatusCode(500, "An error occurred while deleting the booking");
+            }
+        }
+
+        #endregion
+
         /// <summary>
         /// Check time slot availability
         /// </summary>
@@ -515,21 +729,22 @@ namespace WebApplication1.Controllers
         /// <summary>
         /// Validate QR code
         /// </summary>
-        /// <param name="qrData">QR code data</param>
+        /// <param name="request">QR validation request containing QR data and optional operator station ID</param>
         /// <returns>Validation result</returns>
         [HttpPost("validate-qr")]
         [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> ValidateQRCode([FromBody] string qrData)
+        public async Task<IActionResult> ValidateQRCode([FromBody] ValidateQRRequest request)
         {
             try
             {
-                if (string.IsNullOrEmpty(qrData))
+                if (string.IsNullOrEmpty(request.QrData))
                 {
                     return BadRequest("QR code data is required");
                 }
 
-                var result = await _qrCodeService.ValidateQRCodeAsync(qrData);
+                // Pass operator's station ID for validation (null if not provided)
+                var result = await _qrCodeService.ValidateQRCodeAsync(request.QrData, request.OperatorStationId);
 
                 return Ok(new
                 {
@@ -543,6 +758,22 @@ namespace WebApplication1.Controllers
                 _logger.LogError(ex, "Error validating QR code");
                 return StatusCode(500, "An error occurred while validating the QR code");
             }
+        }
+
+        /// <summary>
+        /// Request model for QR code validation
+        /// </summary>
+        public class ValidateQRRequest
+        {
+            /// <summary>
+            /// QR code data string
+            /// </summary>
+            public string QrData { get; set; } = string.Empty;
+
+            /// <summary>
+            /// Station ID of the operator scanning the QR (optional, required for operators)
+            /// </summary>
+            public string? OperatorStationId { get; set; }
         }
 
         #region Private Helper Methods
@@ -728,5 +959,239 @@ namespace WebApplication1.Controllers
         }
 
         #endregion
+
+        #region Station Operator Operations
+
+        /// <summary>
+        /// Verify booking details from QR code scan (Station Operator)
+        /// </summary>
+        /// <param name="id">Booking ID</param>
+        /// <param name="operatorStationId">Station ID of the operator (optional, for security validation)</param>
+        /// <returns>Complete booking details for verification</returns>
+        [HttpGet("{id}/verify")]
+        [ProducesResponseType(typeof(BookingResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> VerifyBooking(string id, [FromQuery] string? operatorStationId = null)
+        {
+            try
+            {
+                _logger.LogInformation($"Verifying booking: {id} by operator at station: {operatorStationId ?? "not specified"}");
+
+                var booking = await _bookingService.GetBookingByIdAsync(id);
+                
+                if (booking == null)
+                {
+                    _logger.LogWarning($"Booking not found for verification: {id}");
+                    return NotFound($"Booking with ID {id} not found");
+                }
+
+                // SECURITY CHECK: Validate that the booking belongs to the operator's station
+                if (!string.IsNullOrEmpty(operatorStationId))
+                {
+                    if (booking.ChargingStationId != operatorStationId)
+                    {
+                        _logger.LogWarning(
+                            $"SECURITY VIOLATION: Operator at station {operatorStationId} " +
+                            $"attempted to verify booking {id} which belongs to station {booking.ChargingStationId}"
+                        );
+                        return StatusCode(403, 
+                            "This booking belongs to a different charging station. " +
+                            "You can only verify bookings for your assigned station.");
+                    }
+                }
+
+                // Check if booking is in valid state for verification
+                if (booking.Status != BookingStatus.Approved)
+                {
+                    _logger.LogWarning($"Booking {id} has invalid status for verification: {booking.Status}");
+                    return BadRequest($"Booking status must be Approved to start. Current status: {booking.Status}");
+                }
+
+                // Fetch charging station details
+                ChargingStationResponseDto? stationDto = null;
+                if (!string.IsNullOrEmpty(booking.ChargingStationId))
+                {
+                    var station = await _chargingStationService.GetByIdAsync(booking.ChargingStationId);
+                    if (station != null)
+                    {
+                        stationDto = new ChargingStationResponseDto
+                        {
+                            Id = station.Id ?? string.Empty,
+                            StationName = station.StationName,
+                            Location = station.Location ?? string.Empty,
+                            Address = station.Address,
+                            Status = station.Status,
+                            ConnectorType = station.ConnectorType ?? string.Empty,
+                            PowerRatingKW = station.PowerRatingKW,
+                            PricePerKWh = station.PricePerKWh,
+                            Description = station.Description ?? string.Empty,
+                            Amenities = station.Amenities ?? new List<string>(),
+                            OperatingHours = station.OperatingHours ?? string.Empty,
+                            IsAvailable = station.Status == ChargingStationStatus.Active.ToString(),
+                            MaxBookingDurationMinutes = station.MaxBookingDurationMinutes,
+                            Coordinates = (station.Latitude.HasValue && station.Longitude.HasValue) ? new CoordinatesDto
+                            {
+                                Latitude = station.Latitude.Value,
+                                Longitude = station.Longitude.Value
+                            } : null
+                        };
+                    }
+                }
+
+                // Return complete booking details
+                var response = new BookingResponseDto
+                {
+                    Id = booking.Id,
+                    BookingNumber = booking.BookingNumber,
+                    UserId = booking.UserId,
+                    ChargingStationId = booking.ChargingStationId,
+                    BookingDate = booking.BookingDate,
+                    StartTime = booking.StartTime,
+                    EndTime = booking.EndTime,
+                    Status = booking.Status,
+                    VehicleNumber = booking.VehicleNumber,
+                    VehicleType = booking.VehicleType,
+                    EstimatedChargingTimeMinutes = booking.EstimatedChargingTimeMinutes,
+                    Notes = booking.Notes,
+                    CreatedAt = booking.CreatedAt,
+                    QRCode = booking.QRCode,
+                    ChargingStation = stationDto,
+                    TotalCost = booking.TotalCost
+                };
+
+                _logger.LogInformation($"Booking {id} verified successfully with station: {stationDto?.StationName ?? "Unknown"}");
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error verifying booking {id}");
+                return StatusCode(500, "An error occurred while verifying the booking");
+            }
+        }
+
+        /// <summary>
+        /// Complete a charging session (Station Operator)
+        /// </summary>
+        /// <param name="id">Booking ID</param>
+        /// <param name="request">Completion data including energy consumed and notes</param>
+        /// <returns>Updated booking information</returns>
+        [HttpPost("{id}/complete")]
+        [ProducesResponseType(typeof(BookingResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> CompleteBooking(string id, [FromBody] CompleteSessionRequest request)
+        {
+            try
+            {
+                _logger.LogInformation($"Completing booking: {id}, Energy: {request.EnergyConsumedKWh} kWh");
+
+                var booking = await _bookingService.GetBookingByIdAsync(id);
+                
+                if (booking == null)
+                {
+                    _logger.LogWarning($"Booking not found for completion: {id}");
+                    return NotFound($"Booking with ID {id} not found");
+                }
+
+                // Validate booking status
+                if (booking.Status != BookingStatus.Approved)
+                {
+                    _logger.LogWarning($"Booking {id} has invalid status for completion: {booking.Status}");
+                    return BadRequest($"Booking must be Approved to complete. Current status: {booking.Status}");
+                }
+
+                // Validate energy consumed
+                if (request.EnergyConsumedKWh <= 0)
+                {
+                    return BadRequest("Energy consumed must be greater than 0");
+                }
+
+                if (request.EnergyConsumedKWh > 1000)
+                {
+                    return BadRequest("Energy consumed seems unreasonably high (max 1000 kWh)");
+                }
+
+                // Calculate cost (example rate: LKR 50 per kWh)
+                const decimal ratePerKWh = 50.0m;
+                var totalCost = (decimal)request.EnergyConsumedKWh * ratePerKWh;
+
+                // Update booking
+                var filter = Builders<Booking>.Filter.Eq(b => b.Id, id);
+                var update = Builders<Booking>.Update
+                    .Set(b => b.Status, BookingStatus.Completed)
+                    .Set(b => b.EnergyConsumedKWh, (decimal)request.EnergyConsumedKWh)
+                    .Set(b => b.TotalCost, totalCost)
+                    .Set(b => b.CompletedAt, DateTime.UtcNow)
+                    .Set(b => b.QRCode, string.Empty); // Clear QR code - no longer needed after completion
+
+                // Add completion notes if provided
+                if (!string.IsNullOrWhiteSpace(request.Notes))
+                {
+                    var completionNote = $"[Completed] {request.Notes}";
+                    var existingNotes = booking.Notes ?? "";
+                    var updatedNotes = string.IsNullOrWhiteSpace(existingNotes) 
+                        ? completionNote 
+                        : $"{existingNotes}\n{completionNote}";
+                    
+                    update = update.Set(b => b.Notes, updatedNotes);
+                }
+
+                var result = await _mongoDBService.Bookings.UpdateOneAsync(filter, update);
+
+                if (result.ModifiedCount == 0)
+                {
+                    _logger.LogWarning($"Failed to update booking {id}");
+                    return StatusCode(500, "Failed to complete booking");
+                }
+
+                // Fetch updated booking
+                var updatedBooking = await _bookingService.GetBookingByIdAsync(id);
+
+                var response = new BookingResponseDto
+                {
+                    Id = updatedBooking.Id,
+                    BookingNumber = updatedBooking.BookingNumber,
+                    UserId = updatedBooking.UserId,
+                    ChargingStationId = updatedBooking.ChargingStationId,
+                    BookingDate = updatedBooking.BookingDate,
+                    StartTime = updatedBooking.StartTime,
+                    EndTime = updatedBooking.EndTime,
+                    Status = updatedBooking.Status,
+                    VehicleNumber = updatedBooking.VehicleNumber,
+                    VehicleType = updatedBooking.VehicleType,
+                    EstimatedChargingTimeMinutes = updatedBooking.EstimatedChargingTimeMinutes,
+                    EnergyConsumedKWh = updatedBooking.EnergyConsumedKWh,
+                    TotalCost = updatedBooking.TotalCost,
+                    Notes = updatedBooking.Notes,
+                    CreatedAt = updatedBooking.CreatedAt,
+                    CompletedAt = updatedBooking.CompletedAt,
+                    QRCode = updatedBooking.QRCode
+                };
+
+                _logger.LogInformation($"Booking {id} completed successfully. Energy: {request.EnergyConsumedKWh} kWh, Cost: LKR {totalCost}");
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error completing booking {id}");
+                return StatusCode(500, "An error occurred while completing the booking");
+            }
+        }
+
+        #endregion
     }
+}
+
+/// <summary>
+/// Request model for completing a charging session
+/// </summary>
+public class CompleteSessionRequest
+{
+    [Required]
+    [Range(0.01, 1000, ErrorMessage = "Energy consumed must be between 0.01 and 1000 kWh")]
+    public double EnergyConsumedKWh { get; set; }
+
+    public string? Notes { get; set; }
 }

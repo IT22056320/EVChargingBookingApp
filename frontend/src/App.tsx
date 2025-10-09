@@ -3,9 +3,13 @@ import { AuthProvider } from '@/providers/auth-provider'
 import { NotificationProvider } from '@/providers/notification-provider'
 import { LoginPage } from '@/pages/auth/login'
 import { DashboardPage } from '@/pages/dashboard'
+import { OperatorDashboardPage } from '@/pages/operator-dashboard'
 import { BookingsPage } from '@/pages/bookings'
 import { CreateBookingPage } from '@/pages/create-booking'
 import { EVOwnersPage } from '@/pages/ev-owners'
+import AddStationPage from './pages/station-mgt/add-station'
+import StationManagementPage from './pages/station-mgt/stations'
+import EditStationPage from './pages/station-mgt/edit-station'
 import { ProtectedRoute } from '@/components/auth/protected-route'
 import { Layout } from '@/components/layout/layout'
 import { ToastNotifications } from '@/components/notifications/toast-notifications'
@@ -25,9 +29,13 @@ function App() {
                   <Routes>
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/dashboard" element={<DashboardPage />} />
+                    <Route path="/operator-dashboard" element={<OperatorDashboardPage />} />
                     <Route path="/bookings" element={<BookingsPage />} />
                     <Route path="/create-booking" element={<CreateBookingPage />} />
                     <Route path="/ev-owners" element={<EVOwnersPage />} />
+                    <Route path="/add-station" element={<AddStationPage />} />
+                    <Route path="/stations" element={<StationManagementPage />} />
+                    <Route path='/edit-station/:id' element={<EditStationPage />} />
                   </Routes>
                 </Layout>
               </ProtectedRoute>
