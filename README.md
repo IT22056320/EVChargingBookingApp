@@ -1,5 +1,3 @@
-Searched codebase for "give me a readme file for this app", 12 results
-
 # EV Charging Booking Application
 
 A comprehensive electric vehicle charging station booking and management system with web admin interface and mobile application for EV owners and station operators.
