@@ -297,6 +297,7 @@ export function BookingsPage() {
       case BookingStatus.Rejected:
         return 'bg-gray-100 text-gray-800 border-gray-200'
       case BookingStatus.NoShow:
+      case BookingStatus.Missed:
         return 'bg-yellow-100 text-yellow-800 border-yellow-200'
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200'
@@ -318,6 +319,7 @@ export function BookingsPage() {
       case BookingStatus.Rejected:
         return <X className="h-3 w-3" />
       case BookingStatus.NoShow:
+      case BookingStatus.Missed:
         return <AlertCircle className="h-3 w-3" />
       default:
         return <Clock className="h-3 w-3" />
