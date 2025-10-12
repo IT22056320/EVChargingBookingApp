@@ -213,10 +213,14 @@ export interface ReviewModificationRequestDto {
 export interface AdminUpdateBookingDto {
   updatedBy: string
   updateReason: string // 10-500 characters
-  stationId?: string
+  chargingStationId?: string
+  bookingDate?: string // ISO date string
   startTime?: string // ISO datetime string
   endTime?: string // ISO datetime string
   vehicleNumber?: string
+  vehicleType?: string
+  estimatedChargingTimeMinutes?: number
+  notes?: string
 }
 
 export interface AdminDeleteBookingDto {

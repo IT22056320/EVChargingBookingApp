@@ -28,9 +28,13 @@ export function AdminUpdateBookingModal({
   const [stations, setStations] = useState<ChargingStation[]>([])
   const [formData, setFormData] = useState({
     stationId: booking.chargingStationId,
+    bookingDate: booking.bookingDate,
     startTime: booking.startTime,
     endTime: booking.endTime,
     vehicleNumber: booking.vehicleNumber,
+    vehicleType: booking.vehicleType,
+    estimatedChargingTimeMinutes: booking.estimatedChargingTimeMinutes,
+    notes: '',
     updateReason: ''
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -44,9 +48,13 @@ export function AdminUpdateBookingModal({
       // Reset form to current booking values
       setFormData({
         stationId: booking.chargingStationId,
+        bookingDate: booking.bookingDate,
         startTime: booking.startTime,
         endTime: booking.endTime,
         vehicleNumber: booking.vehicleNumber,
+        vehicleType: booking.vehicleType,
+        estimatedChargingTimeMinutes: booking.estimatedChargingTimeMinutes,
+        notes: '',
         updateReason: ''
       })
       setHasCheckedAvailability(false)
@@ -143,15 +151,19 @@ export function AdminUpdateBookingModal({
       const updateDto: AdminUpdateBookingDto = {
         updatedBy: adminId,
         updateReason: formData.updateReason,
-        // Only include changed fields
-        ...(formData.stationId !== booking.chargingStationId && { stationId: formData.stationId }),
-        ...(formData.startTime !== booking.startTime && { startTime: formData.startTime }),
-        ...(formData.endTime !== booking.endTime && { endTime: formData.endTime }),
-        ...(formData.vehicleNumber !== booking.vehicleNumber && { vehicleNumber: formData.vehicleNumber })
+        chargingStationId: formData.stationId,
+        bookingDate: formData.bookingDate,
+        startTime: formData.startTime,
+        endTime: formData.endTime,
+        vehicleNumber: formData.vehicleNumber,
+        vehicleType: formData.vehicleType,
+        estimatedChargingTimeMinutes: formData.estimatedChargingTimeMinutes,
+        notes: formData.notes
       }
 
-      await bookingApi.adminUpdateBooking(booking.id, updateDto)
+      const response = await bookingApi.adminUpdateBooking(booking.id, updateDto)
       
+      console.log('Update response:', response)
       toast.success('Booking updated successfully! Customer has been notified.')
       onSuccess()
       onClose()

@@ -24,6 +24,7 @@ namespace WebApplication1.Services
         Task SendModificationRejectedAsync(string bookingId, string userId, string rejectionReason);
         Task SendAdminUpdatedBookingAsync(string bookingId, string userId, string updateReason);
         Task SendAdminDeletedBookingAsync(string bookingId, string userId, string deletionReason);
+        Task SendStationOperatorNotificationAsync(string operatorId, string bookingId, string message, string notificationType);
     }
 
     public class NotificationService : INotificationService
@@ -434,6 +435,38 @@ namespace WebApplication1.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Failed to send admin deletion notification for booking {bookingId}");
+            }
+        }
+
+        /// <summary>
+        /// Send notification to station operator
+        /// </summary>
+        public async Task SendStationOperatorNotificationAsync(string operatorId, string bookingId, string message, string notificationType)
+        {
+            try
+            {
+                var notification = new
+                {
+                    OperatorId = operatorId,
+                    BookingId = bookingId,
+                    Message = message,
+                    Timestamp = DateTime.UtcNow,
+                    Type = notificationType
+                };
+
+                // Send to station operator role group
+                await _hubContext.Clients.Group("StationOperator")
+                    .SendAsync("StationOperatorNotification", notification);
+
+                // Send to specific operator if they have user-specific connection
+                await _hubContext.Clients.User(operatorId)
+                    .SendAsync("StationOperatorNotification", notification);
+
+                _logger.LogInformation($"Sent {notificationType} notification to station operator {operatorId} for booking {bookingId}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Failed to send station operator notification for booking {bookingId}");
             }
         }
     }
