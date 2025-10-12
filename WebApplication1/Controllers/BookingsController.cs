@@ -831,9 +831,23 @@ namespace WebApplication1.Controllers
             // Get user details
             try
             {
-                var user = await _mongoDBService.EVOwners
-                    .Find(u => u.Id == booking.UserId)
-                    .FirstOrDefaultAsync();
+                User? user = null;
+                
+                // Check if UserId is a valid ObjectId or a phone number
+                if (MongoDB.Bson.ObjectId.TryParse(booking.UserId, out _))
+                {
+                    // It's a valid ObjectId, query by Id
+                    user = await _mongoDBService.EVOwners
+                        .Find(u => u.Id == booking.UserId)
+                        .FirstOrDefaultAsync();
+                }
+                else
+                {
+                    // It's likely a phone number (legacy data), query by phone number
+                    user = await _mongoDBService.EVOwners
+                        .Find(u => u.PhoneNumber == booking.UserId)
+                        .FirstOrDefaultAsync();
+                }
 
                 if (user != null)
                 {

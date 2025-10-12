@@ -90,7 +90,8 @@ export enum BookingStatus {
   Completed = "Completed",
   Cancelled = "Cancelled",
   Rejected = "Rejected",
-  NoShow = "NoShow"
+  NoShow = "NoShow",
+  Missed = "Missed"
 }
 
 export enum ConnectorType {
