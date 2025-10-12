@@ -22,7 +22,10 @@ namespace WebApplication1.Models
         Approved = 1,
         Completed = 2,
         Cancelled = 3,
-        Rejected = 4
+        Rejected = 4,
+        NoShow = 5,      // Customer didn't show up for the booking
+        Missed = 6,      // Legacy status - same as NoShow
+        InProgress = 7   // Booking is currently active
     }
 
     /// <summary>

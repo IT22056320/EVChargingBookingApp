@@ -1685,15 +1685,53 @@ namespace WebApplication1.Services
 
                 updateBuilder = updateBuilder.Push(b => b.ModificationHistory, historyEntry);
 
-                await _mongoDBService.Bookings.UpdateOneAsync(
+                var updateResult = await _mongoDBService.Bookings.UpdateOneAsync(
                     b => b.Id == bookingId,
                     updateBuilder
                 );
 
-                var updatedBooking = await GetBookingByIdAsync(bookingId);
+                if (updateResult.ModifiedCount == 0)
+                {
+                    _logger.LogWarning($"Update operation for booking {bookingId} reported 0 modified documents");
+                }
+
+                // Force a fresh read from database to ensure we get the updated data
+                var updatedBooking = await _mongoDBService.Bookings
+                    .Find(b => b.Id == bookingId)
+                    .FirstOrDefaultAsync();
+
+                if (updatedBooking == null)
+                {
+                    _logger.LogError($"Failed to retrieve booking {bookingId} after update");
+                    return (false, "Failed to retrieve updated booking.", null);
+                }
 
                 // Send notification to customer
                 await _notificationService.SendAdminUpdatedBookingAsync(bookingId, booking.UserId, updateDto.UpdateReason);
+
+                // Send notification to station operator
+                try
+                {
+                    var stationId = updateDto.ChargingStationId ?? booking.ChargingStationId;
+                    var station = await _mongoDBService.ChargingStations
+                        .Find(s => s.Id == stationId)
+                        .FirstOrDefaultAsync();
+
+                    if (station != null && !string.IsNullOrEmpty(station.OperatorId))
+                    {
+                        var operatorMessage = $"Booking {booking.BookingNumber} at your station '{station.StationName}' has been updated by admin. Reason: {updateDto.UpdateReason}";
+                        await _notificationService.SendStationOperatorNotificationAsync(
+                            station.OperatorId, 
+                            bookingId, 
+                            operatorMessage, 
+                            "BookingUpdated"
+                        );
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, $"Failed to notify station operator for booking {bookingId} update");
+                }
 
                 _logger.LogInformation($"Admin {updateDto.UpdatedBy} updated booking {bookingId}");
                 return (true, "Booking updated successfully by admin.", updatedBooking);
